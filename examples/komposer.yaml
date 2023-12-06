@@ -1,0 +1,57 @@
+apiVersion: extentions.k8s.io/v1
+kind: Komposer
+metadata:
+  name: replicateds3.extentions.k8s.aws
+spec:
+  name: ReplicatedS3
+  apiVersion: someapiversion.example.io
+  spec:
+    fields:
+      # maybe stick to OpenAPIV3 Schema
+      primaryRegion:
+        type: string
+      secondaryRegion: string
+      acl: string
+      objectLockEnabledForBucket: bool
+
+  extentionValidation: |
+    primaryRegion == us-west-1 || us-west-2 &&
+      secondaryRegion == us-east-1 || us-east-2 &&
+      acl != Public
+
+  # maybe not needed?
+  # because the CR will have the extention specs and those will be variables too..
+  variables:
+    - policy: "{}"
+    - namePrefix: replicated-bucket
+
+  resources:
+    - name: my-primary-bucket #only used for maping # but could be used to inject in spec stuff
+      definition:
+        apiVersion: s3.services.k8s.aws
+        kind: Bucket
+        metadata:
+          annotations:
+            k8s.aws/region: $spec.primaryRegion
+            description: $resource.name
+            someweirdCELStuff: $resource[my-primary-bucket].definition.metadata.annotations[someweirdCELStuff] # circular
+        spec:
+          name: $variables.namePrefix-$ACK_RANDOM_STRING
+          policy: $variables.policy
+          acl: $spec.acl
+          objectLockEnabledForBucket: $spec.objectLockEnabledForBucket
+      validation: CEL # CEL Expression
+      hooks:
+        onCondition:
+          condition: ACKSynced=True
+          expression: {}
+    - resource: { spec: {}, metadata: {}, kind: null, apiVersion: null } # lambda function
+      validation: CEL # CEL Expression
+      hooks:
+        onACKSynced:
+          expression: {}
+        onAdopted: maybe
+  hooks:
+    onSubResoucresReady:
+      copyToSecret: {} # ?
+      waitForAdoptedResource: {} # ?
