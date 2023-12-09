@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - x.symphony.k8s.aws
+  resources:
+  - abstractions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - x.symphony.k8s.aws
+  resources:
+  - abstractions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - x.symphony.k8s.aws
+  resources:
+  - abstractions/status
+  verbs:
+  - get
+  - patch
+  - update
