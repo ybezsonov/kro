@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -35,6 +36,7 @@ import (
 	xv1alpha1 "github.com/aws/symphony/api/v1alpha1"
 	"github.com/aws/symphony/internal/controller"
 	"github.com/aws/symphony/internal/crd"
+	"github.com/aws/symphony/internal/dynamiccontroller"
 	"github.com/aws/symphony/internal/kubernetes"
 	"github.com/aws/symphony/internal/schema"
 	//+kubebuilder:scaffold:imports
@@ -98,13 +100,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	dynamicClient, err := kubernetes.NewDynamicClient()
+	if err != nil {
+		setupLog.Error(err, "unable to create crd client")
+		os.Exit(1)
+	}
+
 	crdManager := crd.Manager{Client: crdClient}
 
+	dc := dynamiccontroller.NewDynamicController(context.Background(), "dc-system", dynamicClient, nil)
+	go dc.Run(context.Background(), 10)
+
 	if err = (&controller.AbstractionReconciler{
-		Client:        mgr.GetClient(),
-		Scheme:        mgr.GetScheme(),
-		CRDManager:    crdManager,
-		OpenAPISchema: &schema.OpenAPISchemaTransformer{},
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		CRDManager:        crdManager,
+		OpenAPISchema:     &schema.OpenAPISchemaTransformer{},
+		DynamicController: dc,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Abstraction")
 		os.Exit(1)

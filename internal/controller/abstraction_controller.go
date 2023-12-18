@@ -19,8 +19,8 @@ package controller
 import (
 	"context"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -29,7 +29,7 @@ import (
 	xv1alpha1 "github.com/aws/symphony/api/v1alpha1"
 	"github.com/aws/symphony/internal/crd"
 	"github.com/aws/symphony/internal/dynamiccontroller"
-	"github.com/aws/symphony/internal/schema"
+	openapischema "github.com/aws/symphony/internal/schema"
 )
 
 // AbstractionReconciler reconciles a Abstraction object
@@ -37,7 +37,7 @@ type AbstractionReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
 	CRDManager        crd.Manager
-	OpenAPISchema     *schema.OpenAPISchemaTransformer
+	OpenAPISchema     *openapischema.OpenAPISchemaTransformer
 	DynamicController *dynamiccontroller.DynamicController
 }
 
@@ -100,11 +100,13 @@ func (r *AbstractionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, err
 	}
 
-	r.DynamicController.SafeRegisterGVK(v1.GroupVersionKind{
-		Group:   customRD.Spec.Group,
-		Version: customRD.Spec.Versions[0].Name,
-		Kind:    customRD.Kind,
-	})
+	r.DynamicController.SafeRegisterGVK(
+		schema.GroupVersionResource{
+			Group:    customRD.Spec.Group,
+			Version:  customRD.Spec.Versions[0].Name,
+			Resource: customRD.Spec.Names.Plural,
+		},
+	)
 
 	return ctrl.Result{}, nil
 }

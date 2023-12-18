@@ -12,7 +12,6 @@ import (
 	"golang.org/x/time/rate"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -21,7 +20,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
@@ -42,13 +40,13 @@ type DynamicController struct {
 	// rate limited requeues.
 	queue workqueue.RateLimitingInterface
 	// informers is a the map of the registered informers
-	informers   map[v1.GroupVersionKind]dynamicinformer.DynamicSharedInformerFactory
-	cancelFuncs map[v1.GroupVersionKind]context.CancelFunc
+	informers   map[schema.GroupVersionResource]dynamicinformer.DynamicSharedInformerFactory
+	cancelFuncs map[schema.GroupVersionResource]context.CancelFunc
 	// Protects access to the informers map. Could have been a sync.Map but we need to
 	// optimize for the read case.
 	mu sync.RWMutex
 	// listers is a map of the registered listers
-	listers map[v1.GroupVersionKind]dynamiclister.Lister
+	listers map[schema.GroupVersionResource]dynamiclister.Lister
 
 	log *logr.Logger
 }
@@ -57,7 +55,6 @@ func NewDynamicController(
 	ctx context.Context,
 	name string,
 	kubeClient *dynamic.DynamicClient,
-	csrInformer *dynamicinformer.DynamicSharedInformerFactory,
 	handler func(context.Context, ctrl.Request) error,
 ) *DynamicController {
 	logger := klog.FromContext(ctx)
@@ -69,9 +66,11 @@ func NewDynamicController(
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		), "dynamic-controller-queue"),
-		handler:   handler,
-		informers: map[v1.GroupVersionKind]dynamicinformer.DynamicSharedInformerFactory{},
-		log:       &logger,
+		handler:     handler,
+		informers:   map[schema.GroupVersionResource]dynamicinformer.DynamicSharedInformerFactory{},
+		cancelFuncs: map[schema.GroupVersionResource]context.CancelFunc{},
+		log:         &logger,
+		mu:          sync.RWMutex{},
 	}
 	return dc
 }
@@ -85,9 +84,9 @@ func (cc *DynamicController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting symphony dynamic controller", "name", cc.name)
 	defer logger.Info("Shutting symphony dynamic controller", "name", cc.name)
 
-	if !cache.WaitForNamedCacheSync(cc.name, ctx.Done(), cc.synced) {
+	/* 	if !cache.WaitForNamedCacheSync(cc.name, ctx.Done(), cc.synced) {
 		return
-	}
+	} */
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, cc.worker, time.Second)
@@ -136,13 +135,15 @@ func (cc *DynamicController) syncFunc(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		logger.V(4).Info("Finished syncing abstraction claim request", "elapsedTime", time.Since(startTime))
+		logger.Info("Finished syncing abstraction claim request", "elapsedTime", time.Since(startTime))
 	}()
 
 	// need to operate on a copy so we don't mutate the csr in the shared cache
 	// csr = csr.DeepCopy()
 	// handle namespacing
-	return cc.handler(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
+	// return cc.handler(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
+
+	return nil
 }
 
 func (dc *DynamicController) Shutdown() {
@@ -156,60 +157,62 @@ func (dc *DynamicController) Shutdown() {
 }
 
 // RegisterGVK registers a new GVK to the informers map aggressively.
-func (dc *DynamicController) RegisterGVK(gvk v1.GroupVersionKind) {
+func (dc *DynamicController) RegisterGVK(gvr schema.GroupVersionResource) {
 	gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, v1.NamespaceAll, nil)
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	dc.informers[gvk] = gvkInformer
-	dc.log.V(4).Info("Finished registering GVK", "gvk", gvk)
+	dc.informers[gvr] = gvkInformer
+	dc.log.V(4).Info("Finished registering GVK", "gvk", gvr)
 }
 
 // SafeRegisterGVK registers a new GVK to the informers map safely.
-func (dc *DynamicController) SafeRegisterGVK(gvk v1.GroupVersionKind, gvr schema.GroupVersionResource) {
+func (dc *DynamicController) SafeRegisterGVK(gvr schema.GroupVersionResource) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	if _, ok := dc.informers[gvk]; !ok {
-		gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, v1.NamespaceAll, nil)
+	if _, ok := dc.informers[gvr]; !ok {
+		gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 5*time.Second, v1.NamespaceAll, nil)
 		gvkInformer.ForResource(gvr).Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				dc.log.V(4).Info("Adding object")
+				dc.log.Info("Adding object")
 				dc.enqueueObject(obj)
 			},
 			UpdateFunc: func(old, new interface{}) {
-				dc.log.V(4).Info("Updating object request")
+				dc.log.Info("Updating object")
 				dc.enqueueObject(new)
 			},
 			DeleteFunc: func(obj interface{}) {
-				csr, ok := obj.(*certificates.CertificateSigningRequest)
-				if !ok {
-					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-					if !ok {
-						dc.log.V(2).Info("Couldn't get object from tombstone", "object", obj)
-						return
-					}
-					csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
-					if !ok {
-						dc.log.V(2).Info("Tombstone contained object that is not a CSR", "object", obj)
-						return
-					}
-				}
-				dc.log.V(4).Info("Deleting certificate request", "csr", csr.Name)
+				/* 				csr, ok := obj.(*certificates.CertificateSigningRequest)
+				   				if !ok {
+				   					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+				   					if !ok {
+				   						dc.log.V(2).Info("Couldn't get object from tombstone", "object", obj)
+				   						return
+				   					}
+				   					csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
+				   					if !ok {
+				   						dc.log.V(2).Info("Tombstone contained object that is not a CSR", "object", obj)
+				   						return
+				   					}
+				   				} */
+				dc.log.Info("Deleting object")
 				dc.enqueueObject(obj)
 			},
 		})
-		dc.informers[gvk] = gvkInformer
+		dc.informers[gvr] = gvkInformer
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-		dc.cancelFuncs[gvk] = cancel
+		dc.cancelFuncs[gvr] = cancel
 
-		gvkInformer.Start(ctx.Done())
+		time.Sleep(1 * time.Second)
+		fmt.Println("Starting informer")
+		go gvkInformer.Start(ctx.Done())
 	}
-	dc.log.V(4).Info("Finished safe-registering GVK", "gvk", gvk)
+	dc.log.V(4).Info("Finished safe-registering GVR", "gvr", gvr)
 }
 
-func (dc *DynamicController) UnregisterGVK(gvk v1.GroupVersionKind) {
+func (dc *DynamicController) UnregisterGVK(gvr schema.GroupVersionResource) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	delete(dc.informers, gvk)
+	delete(dc.informers, gvr)
 }
 
 func (cc *DynamicController) HotRestart() bool {
