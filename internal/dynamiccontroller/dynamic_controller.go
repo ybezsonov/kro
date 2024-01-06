@@ -8,10 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/symphony/api/v1alpha1"
+	"github.com/aws/symphony/internal/construct"
+	"github.com/aws/symphony/internal/workflow"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -30,12 +34,15 @@ type DynamicController struct {
 	kubeClient *dynamic.DynamicClient
 	// synced informs if the controller is synced with the apiserver
 	synced cache.InformerSynced
+
+	workflowOperators map[string]*workflow.Operator
+
 	// handler is the function that will be called when a new work item is added
 	// to the queue. The argument to the handler is an interface that should be
 	// castable to the appropriate type.
 	//
 	// Note(a-hilaly) maybe unstructured.Unstructured is a better choice here.
-	handler func(context.Context, ctrl.Request) error
+	handlerO func(context.Context, ctrl.Request) error
 	// queue is where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues.
 	queue workqueue.RateLimitingInterface
@@ -58,6 +65,8 @@ func NewDynamicController(
 	handler func(context.Context, ctrl.Request) error,
 ) *DynamicController {
 	logger := klog.FromContext(ctx)
+	// wo := workflow.NewOperator(schema.GroupVersionResource{}, nil, nil)
+
 	dc := &DynamicController{
 		name:       name,
 		kubeClient: kubeClient,
@@ -66,11 +75,13 @@ func NewDynamicController(
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		), "dynamic-controller-queue"),
-		handler:     handler,
-		informers:   map[schema.GroupVersionResource]dynamicinformer.DynamicSharedInformerFactory{},
-		cancelFuncs: map[schema.GroupVersionResource]context.CancelFunc{},
-		log:         &logger,
-		mu:          sync.RWMutex{},
+		handlerO:          handler,
+		informers:         map[schema.GroupVersionResource]dynamicinformer.DynamicSharedInformerFactory{},
+		cancelFuncs:       map[schema.GroupVersionResource]context.CancelFunc{},
+		log:               &logger,
+		mu:                sync.RWMutex{},
+		listers:           map[schema.GroupVersionResource]dynamiclister.Lister{},
+		workflowOperators: map[string]*workflow.Operator{},
 	}
 	return dc
 }
@@ -135,15 +146,11 @@ func (cc *DynamicController) syncFunc(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		logger.Info("Finished syncing abstraction claim request", "elapsedTime", time.Since(startTime))
+		logger.Info("Finished syncing construct claim request", "elapsedTime", time.Since(startTime))
 	}()
 
-	// need to operate on a copy so we don't mutate the csr in the shared cache
-	// csr = csr.DeepCopy()
-	// handle namespacing
-	// return cc.handler(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
-
-	return nil
+	wo := cc.workflowOperators[""]
+	return wo.Handler(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
 }
 
 func (dc *DynamicController) Shutdown() {
@@ -158,7 +165,7 @@ func (dc *DynamicController) Shutdown() {
 
 // RegisterGVK registers a new GVK to the informers map aggressively.
 func (dc *DynamicController) RegisterGVK(gvr schema.GroupVersionResource) {
-	gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, v1.NamespaceAll, nil)
+	gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, metav1.NamespaceAll, nil)
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.informers[gvr] = gvkInformer
@@ -170,7 +177,7 @@ func (dc *DynamicController) SafeRegisterGVK(gvr schema.GroupVersionResource) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	if _, ok := dc.informers[gvr]; !ok {
-		gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 5*time.Second, v1.NamespaceAll, nil)
+		gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 5*time.Second, metav1.NamespaceAll, nil)
 		gvkInformer.ForResource(gvr).Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				dc.log.Info("Adding object")
@@ -218,4 +225,20 @@ func (dc *DynamicController) UnregisterGVK(gvr schema.GroupVersionResource) {
 func (cc *DynamicController) HotRestart() bool {
 	// TODO: implement hot restart
 	return true
+}
+
+func (cc *DynamicController) RegisterWorkflowOperator(gvr schema.GroupVersionResource, c *v1alpha1.Construct) error {
+	resources := make([]v1alpha1.Resource, 0)
+	for _, resource := range c.Spec.Resources {
+		resources = append(resources, *resource)
+	}
+
+	graph, err := construct.NewGraph(resources)
+	if err != nil {
+		return err
+	}
+
+	wo := workflow.NewOperator(gvr, graph, cc.kubeClient.Resource(gvr))
+	cc.workflowOperators["gvr"] = wo
+	return nil
 }

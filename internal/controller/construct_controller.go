@@ -32,8 +32,8 @@ import (
 	openapischema "github.com/aws/symphony/internal/schema"
 )
 
-// AbstractionReconciler reconciles a Abstraction object
-type AbstractionReconciler struct {
+// ConstructReconciler reconciles a Construct object
+type ConstructReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
 	CRDManager        crd.Manager
@@ -41,38 +41,38 @@ type AbstractionReconciler struct {
 	DynamicController *dynamiccontroller.DynamicController
 }
 
-//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=abstractions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=abstractions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=abstractions/finalizers,verbs=update
+//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=constructs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=constructs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=constructs/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the Abstraction object against the actual cluster state, and then
+// the Construct object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
-func (r *AbstractionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 	log.Info("Reconciling", "resource", req.NamespacedName)
 
-	var abstraction v1alpha1.Abstraction
-	err := r.Get(ctx, req.NamespacedName, &abstraction)
+	var construct v1alpha1.Construct
+	err := r.Get(ctx, req.NamespacedName, &construct)
 	if err != nil {
-		log.Error(err, "unable to fetch Abstraction object")
+		log.Error(err, "unable to fetch Construct object")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// Handle deletions
-	if !abstraction.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("abstraction is deleted")
+	if !construct.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("construct is deleted")
 		return ctrl.Result{}, nil
 	}
 
 	// Handle creation
-	oaSchema, err := r.OpenAPISchema.Transform(abstraction.Spec.Definition.Spec.Raw)
+	oaSchema, err := r.OpenAPISchema.Transform(construct.Spec.Definition.Spec.Raw)
 	if err != nil {
 		log.Info("unable to transform OpenAPI schema")
 		return ctrl.Result{}, err
@@ -85,7 +85,7 @@ func (r *AbstractionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	   	}
 	   	fmt.Println(string(yamlSchema)) */
 
-	customRD := crd.FromOpenAPIV3Schema(abstraction.Spec.ApiVersion, abstraction.Spec.Kind, oaSchema)
+	customRD := crd.FromOpenAPIV3Schema(construct.Spec.ApiVersion, construct.Spec.Kind, oaSchema)
 
 	/* 	bb, err := yaml.Marshal(customRD)
 	   	if err != nil {
@@ -94,9 +94,9 @@ func (r *AbstractionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	   	}
 	   	fmt.Println(string(bb)) */
 
-	err = r.CRDManager.Create(ctx, customRD)
+	err = r.CRDManager.Ensure(ctx, customRD)
 	if err != nil {
-		log.Info("unable to create CRD")
+		log.Info("unable to ensure CRD")
 		return ctrl.Result{}, err
 	}
 
@@ -112,8 +112,8 @@ func (r *AbstractionReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *AbstractionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ConstructReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&xv1alpha1.Abstraction{}).
+		For(&xv1alpha1.Construct{}).
 		Complete(r)
 }

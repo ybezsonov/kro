@@ -24,8 +24,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// AbstractionSpec defines the desired state of Abstraction
-type AbstractionSpec struct {
+// ConstructSpec defines the desired state of Construct
+type ConstructSpec struct {
 	// +kubebuilder:validation:Required
 	Kind string `json:"kind,omitempty"`
 	// +kubebuilder:validation:Required
@@ -50,31 +50,31 @@ type Resource struct {
 	Definition runtime.RawExtension `json:"definition,omitempty"`
 }
 
-// AbstractionStatus defines the observed state of Abstraction
-type AbstractionStatus struct {
+// ConstructStatus defines the observed state of Construct
+type ConstructStatus struct {
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Abstraction is the Schema for the abstractions API
-type Abstraction struct {
+// Construct is the Schema for the constructs API
+type Construct struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AbstractionSpec   `json:"spec,omitempty"`
-	Status AbstractionStatus `json:"status,omitempty"`
+	Spec   ConstructSpec   `json:"spec,omitempty"`
+	Status ConstructStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// AbstractionList contains a list of Abstraction
-type AbstractionList struct {
+// ConstructList contains a list of Construct
+type ConstructList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Abstraction `json:"items"`
+	Items           []Construct `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Abstraction{}, &AbstractionList{})
+	SchemeBuilder.Register(&Construct{}, &ConstructList{})
 }

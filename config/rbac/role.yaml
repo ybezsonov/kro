@@ -7,7 +7,7 @@ rules:
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions
+  - constructs
   verbs:
   - create
   - delete
@@ -19,13 +19,13 @@ rules:
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions/finalizers
+  - constructs/finalizers
   verbs:
   - update
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions/status
+  - constructs/status
   verbs:
   - get
   - patch

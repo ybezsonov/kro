@@ -1,20 +1,20 @@
-# permissions for end users to view abstractions.
+# permissions for end users to view constructs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: abstraction-viewer-role
+    app.kubernetes.io/instance: construct-viewer-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: symphony
     app.kubernetes.io/part-of: symphony
     app.kubernetes.io/managed-by: kustomize
-  name: abstraction-viewer-role
+  name: construct-viewer-role
 rules:
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions
+  - constructs
   verbs:
   - get
   - list
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions/status
+  - constructs/status
   verbs:
   - get

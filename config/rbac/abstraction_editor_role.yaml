@@ -1,20 +1,20 @@
-# permissions for end users to edit abstractions.
+# permissions for end users to edit constructs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: abstraction-editor-role
+    app.kubernetes.io/instance: construct-editor-role
     app.kubernetes.io/component: rbac
     app.kubernetes.io/created-by: symphony
     app.kubernetes.io/part-of: symphony
     app.kubernetes.io/managed-by: kustomize
-  name: abstraction-editor-role
+  name: construct-editor-role
 rules:
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions
+  - constructs
   verbs:
   - create
   - delete
@@ -26,6 +26,6 @@ rules:
 - apiGroups:
   - x.symphony.k8s.aws
   resources:
-  - abstractions/status
+  - constructs/status
   verbs:
   - get

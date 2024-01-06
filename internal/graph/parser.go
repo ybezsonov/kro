@@ -22,20 +22,20 @@ type ReferenceType string
 
 const (
 	// ReferenceTypeSpec indicates that the reference is targetting a
-	// spec field of the AbstractionClaim resource.
+	// spec field of the ConstructClaim resource.
 	ReferenceTypeSpec ReferenceType = "spec"
 	// ReferenceTypeStatus indicates that the reference is targetting a
-	// status field of the AbstractionClaim resource.
+	// status field of the ConstructClaim resource.
 	// This is not possible...
 	ReferenceTypeStatus ReferenceType = "status"
 	// ReferenceTypeAnnotation indicates that the reference is targetting an
-	// annotation field of the AbstractionClaim resource.
+	// annotation field of the ConstructClaim resource.
 	ReferenceTypeAnnotation ReferenceType = "annotation"
 	// ReferenceTypeMetadata indicates that the reference is targetting a
-	// metadata field of the AbstractionClaim resource.
+	// metadata field of the ConstructClaim resource.
 	ReferenceTypeMetadata ReferenceType = "metadata"
 	// ReferenceTypeResource indicates that the reference is targetting a
-	// another resource that is part of the Abstraction collection.
+	// another resource that is part of the Construct collection.
 	ReferenceTypeResource ReferenceType = "resource"
 )
 
@@ -169,17 +169,17 @@ func (y *YamlParser) Parse(raw []byte, yqPath string) (string, error) {
 
 	// create tmp dir
 	tempFileName := RandStringBytes(10) + ".yaml"
-	fmt.Println(tempFileName)
+	// fmt.Println(tempFileName)
 	// write the raw into tmp file
 	err := os.WriteFile(filepath.Join(y.tmp, tempFileName), cleanRaw, 0644)
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(filepath.Join(y.tmp, tempFileName))
+	// fmt.Println(filepath.Join(y.tmp, tempFileName))
 	defer os.Remove(filepath.Join(y.tmp, tempFileName))
 	// call yq
 	cmd := exec.Command("yq", yqPath, filepath.Join(y.tmp, tempFileName))
-	fmt.Println("yq", yqPath, filepath.Join(y.tmp, tempFileName))
+	// fmt.Println("yq", yqPath, filepath.Join(y.tmp, tempFileName))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err

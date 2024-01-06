@@ -2,172 +2,109 @@ package workflow
 
 import (
 	"context"
-	"sync"
+	"fmt"
 
-	"github.com/aws/symphony/internal/graph"
+	"github.com/aws/symphony/internal/construct"
+	"github.com/aws/symphony/internal/requeue"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 // This package transforms the Resource Graph into a Workflow matrix.
 // Now we need to know how to deploy, update and delete the resources.
 
-func New(
-	name string,
-	owner metav1.OwnerReference,
+func NewOperator(
 	target schema.GroupVersionResource,
-	c *graph.Collection,
+	g *construct.Graph,
 	client dynamic.NamespaceableResourceInterface,
 ) *Operator {
 	return &Operator{
-		name:       name,
-		owner:      owner,
-		target:     target,
-		Collection: c,
-		client:     client,
+		target:       target,
+		Graph:        g,
+		client:       client,
+		stateTracker: construct.NewStateTracker(g),
 	}
 }
 
 type Operator struct {
-	defaultNamestring string
-	name              string
-	owner             metav1.OwnerReference
-	target            schema.GroupVersionResource
+	target schema.GroupVersionResource
 
-	Collection *graph.Collection
-	client     dynamic.NamespaceableResourceInterface
+	client dynamic.NamespaceableResourceInterface
 
-	mu sync.Mutex
+	Graph *construct.Graph
 
-	ReadOne func(namespacedName string) (*unstructured.Unstructured, error)
-	Delta   func() error
+	stateTracker *construct.StateTracker
 
-	CreateSteps [][]*Step
-	UpdateSteps [][]*Step
-	DeleteSteps [][]*Step
+	CreateProcess []*Process
+	// maybe UpdateProcess []*Process
+	DeleteProcess []*Process
 }
 
-type StepType string
+func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
+	// extract claim from request
+	claimUnstructured, err := o.client.Get(ctx, req.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
 
-const (
-	StepTypeKubernetesCreate StepType = "KubernetesCreate"
-	StepTypeKubernetesUpdate StepType = "KubernetesUpdate"
-	StepTypeKubernetesDelete StepType = "KubernetesDelete"
-	StepTypeKubernetesRead   StepType = "KubernetesRead"
-	StepTypeKubernetesDelta  StepType = "KubernetesDelta"
-	StepTypeResourceReplace  StepType = "ResourceReplace"
-)
+	o.Graph.Claim = construct.Claim{Unstructured: claimUnstructured}
+	err = o.Graph.TopologicalSort()
+	if err != nil {
+		return err
+	}
+	err = o.Graph.ResolvedVariables()
+	if err != nil {
+		return err
+	}
+	err = o.Graph.ReplaceVariables()
+	if err != nil {
+		return err
+	}
 
-type Step struct {
-	// The name of the resource that this step is operating on.
-	ResourceName string
-	// The name of the step.
-	Name string
-	// Type is the type of the step.
-	Type StepType
-	// Action is the action that this step is performing.
-	Action func(*graph.Collection) error
-}
+	for _, resource := range o.Graph.Resources {
+		if !o.stateTracker.ResourceDependenciesReady(resource.RuntimeID) {
+			return requeue.NeededAfter(fmt.Errorf("resource dependencies not ready"), 5)
+		}
 
-func (o *Operator) Create() error {
-	for _, step := range o.CreateSteps {
-		for _, s := range step {
-			err := s.Action(o.Collection)
-			if err != nil {
+		// Check if resource exists
+		observed, err := o.client.Get(ctx, resource.Metadata().Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				_, err := o.client.Create(ctx, resource.Unstructured(), metav1.CreateOptions{})
+				if err != nil {
+					return err
+				}
+				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateCreating)
+			} else {
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-func (o *Operator) Update() error {
-	for _, step := range o.UpdateSteps {
-		for _, s := range step {
-			err := s.Action(o.Collection)
-			if err != nil {
-				return err
+		if observed != nil {
+			observedStatus, ok := observed.Object["status"]
+			if ok {
+				err := resource.SetStatus(observedStatus.(map[string]interface{}))
+				if err != nil {
+					return err
+				}
+				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
+				// ...
+				err = o.Graph.ResolvedVariables()
+				if err != nil {
+					return err
+				}
+				err = o.Graph.ReplaceVariables()
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
-	return nil
-}
-
-func (o *Operator) Delete() error {
-	for _, step := range o.DeleteSteps {
-		for _, s := range step {
-			err := s.Action(o.Collection)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (o *Operator) Build(collection *graph.Collection) error {
-	o.Collection = collection
-	o.CreateSteps = o.buildCreateSteps()
-	o.UpdateSteps = o.buildUpdateSteps()
-	o.DeleteSteps = o.buildDeleteSteps()
-	return nil
-}
-
-func (o *Operator) buildCreateSteps() [][]*Step {
-	// first we need to find the root resources.
-	// root resources are resources that are not referenced by any other resource.
-	// Then we need to find the resources that depend on the root resources.
-	// Then we need to find the resources that depend on the resources that depend on the root resources.
-	// And so on.
-
-	steps := make([][]*Step, 0)
-
-	rootResources := make([]*graph.Resource, 0)
-
-	for _, resource := range o.Collection.Resources {
-		if len(resource.DependsOn) == 0 {
-			// this is a root resource.
-			rootResources = append(rootResources, resource)
-		}
+	if !o.stateTracker.AllReady() {
+		return requeue.NeededAfter(fmt.Errorf("not all resources are ready"), 5)
 	}
 
-	queuedResouces := map[string]bool{}
-	rootSteps := make([]*Step, 0)
-	for _, resource := range rootResources {
-		rootSteps = append(rootSteps, &Step{
-			ResourceName: resource.Name,
-			Name:         "Create resource " + resource.Name,
-			Action: func(collection *graph.Collection) error {
-				unstructr := resource.Unstructured()
-
-				// Create the resource
-				_, err := o.client.Namespace(unstructr.GetNamespace()).Apply(
-					context.Background(), unstructr.GetName(), &unstructr, metav1.ApplyOptions{},
-				)
-				return err
-			},
-		})
-	}
-
-	steps = append(steps, rootSteps)
-
-	nextdDepth := 1
-	for len(queuedResouces) != len(o.Collection.Resources) {
-		for _, resource := range o.Collection.Resources {
-			nextdDepth++
-			_ = resource
-		}
-	}
-
-	return nil
-}
-
-func (o *Operator) buildUpdateSteps() [][]*Step {
-	return nil
-}
-
-func (o *Operator) buildDeleteSteps() [][]*Step {
 	return nil
 }

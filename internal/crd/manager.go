@@ -2,6 +2,7 @@ package crd
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -29,6 +30,27 @@ func (m *Manager) Create(ctx context.Context, crd v1.CustomResourceDefinition) e
 		metav1.CreateOptions{},
 	)
 	return err
+}
+
+func (m *Manager) Ensure(ctx context.Context, crd v1.CustomResourceDefinition) error {
+	fmt.Println("Ensuring CRD")
+	_, err := m.Describe(ctx, crd.Name)
+	if err != nil {
+		fmt.Println("Creating CRD")
+		if strings.Contains(err.Error(), "not found") {
+			return m.Create(ctx, crd)
+		}
+		fmt.Println("CRD already exists")
+	}
+	return err
+}
+
+func (m *Manager) Describe(ctx context.Context, name string) (*v1.CustomResourceDefinition, error) {
+	return m.Client.CustomResourceDefinitions().Get(
+		ctx,
+		name,
+		metav1.GetOptions{},
+	)
 }
 
 func (m *Manager) Delete(ctx context.Context, name string) error {

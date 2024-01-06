@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 )
 
 const (
-	IRSAAbstractionSpec = `---
+	IRSAConstructSpec = `---
 definition:
   spec:
     awsAccountID: string
@@ -58,10 +59,10 @@ definition:
 )
 
 func TestBuilder_Build(t *testing.T) {
-	var abstractionMap map[string]interface{}
-	err := yaml.Unmarshal([]byte(IRSAAbstractionSpec), &abstractionMap)
+	var constructMap map[string]interface{}
+	err := yaml.Unmarshal([]byte(IRSAConstructSpec), &constructMap)
 	if err != nil {
-		t.Fatalf("couldn't parse yaml data from resource %s: %v", "abstraction", err)
+		t.Fatalf("couldn't parse yaml data from resource %s: %v", "construct", err)
 	}
 	var irsaResourceAMap map[string]interface{}
 	err = yaml.Unmarshal([]byte(IRSAResourceA), &irsaResourceAMap)
@@ -75,8 +76,8 @@ func TestBuilder_Build(t *testing.T) {
 	}
 
 	type args struct {
-		rawAbstraction       runtime.RawExtension
-		abstractionResources []*v1alpha1.Resource
+		rawConstruct       runtime.RawExtension
+		constructResources []*v1alpha1.Resource
 	}
 	tests := []struct {
 		name    string
@@ -89,13 +90,14 @@ func TestBuilder_Build(t *testing.T) {
 			name: "empty variables",
 			b:    &Builder{},
 			args: args{
-				rawAbstraction:       runtime.RawExtension{},
-				abstractionResources: []*v1alpha1.Resource{},
+				rawConstruct:       runtime.RawExtension{},
+				constructResources: []*v1alpha1.Resource{},
 			},
 			want: &Collection{
-				Abstraction: &Resource{
+				Construct: &Resource{
 					Name:           "main",
 					Data:           nil,
+					Raw:            []byte(IRSAConstructSpec),
 					References:     []*Reference{},
 					DependsOn:      []string{},
 					ReferenceNames: []string{},
@@ -105,18 +107,20 @@ func TestBuilder_Build(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "abstraction only",
+			name: "construct only",
 			b:    &Builder{},
 			args: args{
-				rawAbstraction: runtime.RawExtension{
-					Raw: []byte(IRSAAbstractionSpec),
+				rawConstruct: runtime.RawExtension{
+					Raw: []byte(IRSAConstructSpec),
 				},
-				abstractionResources: []*v1alpha1.Resource{},
+
+				constructResources: []*v1alpha1.Resource{},
 			},
 			want: &Collection{
-				Abstraction: &Resource{
-					Data:           abstractionMap,
+				Construct: &Resource{
+					Data:           constructMap,
 					Name:           "main",
+					Raw:            []byte(IRSAConstructSpec),
 					ReferenceNames: []string{},
 					References:     []*Reference{},
 					DependsOn:      []string{},
@@ -130,18 +134,19 @@ func TestBuilder_Build(t *testing.T) {
 			name: "two resources with dependency",
 			b:    &Builder{},
 			args: args{
-				rawAbstraction: runtime.RawExtension{
-					Raw: []byte(IRSAAbstractionSpec),
+				rawConstruct: runtime.RawExtension{
+					Raw: []byte(IRSAConstructSpec),
 				},
-				abstractionResources: []*v1alpha1.Resource{
+				constructResources: []*v1alpha1.Resource{
 					{Definition: runtime.RawExtension{Raw: []byte(IRSAResourceA)}, Name: "irsa-policy"},
 					{Definition: runtime.RawExtension{Raw: []byte(IRSAResourceB)}, Name: "service-account"},
 				},
 			},
 			want: &Collection{
-				Abstraction: &Resource{
+				Construct: &Resource{
 					Name:           "main",
-					Data:           abstractionMap,
+					Data:           constructMap,
+					Raw:            []byte(IRSAConstructSpec),
 					DependsOn:      []string{},
 					ReferenceNames: []string{},
 					References:     []*Reference{},
@@ -195,7 +200,7 @@ func TestBuilder_Build(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			b := &Builder{}
-			got, err := b.Build(tt.args.rawAbstraction, tt.args.abstractionResources)
+			got, err := b.Build(tt.args.rawConstruct, tt.args.constructResources)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Builder.Build() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -208,14 +213,23 @@ func TestBuilder_Build(t *testing.T) {
 				}
 			}
 
-			if !reflect.DeepEqual(got.Abstraction, tt.want.Abstraction) {
-				t.Errorf("Builder.Build().Abstraction = %+v, want %+v", got, tt.want)
+			if !reflect.DeepEqual(got.Construct, tt.want.Construct) {
+				t.Errorf("Builder.Build().Construct = %+v, want %+v", got, tt.want)
 			}
 			for i, resource := range got.Resources {
 				if !reflect.DeepEqual(got.Resources[i], resource) {
 					t.Errorf("Builder.Build().Resource[%d] = %+v, want %+v", i, got.Resources[i], tt.want)
 				}
 			}
+
+			t.Run("replcements_"+tt.name, func(t *testing.T) {
+				reps, err := got.GetReplaceData()
+				if (err != nil) != tt.wantErr {
+					t.Errorf("Builder.Build() error = %v, wantErr %v", err, tt.wantErr)
+					return
+				}
+				fmt.Println("+++", reps)
+			})
 		})
 	}
 }

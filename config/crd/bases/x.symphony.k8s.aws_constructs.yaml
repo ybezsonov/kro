@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: abstractions.x.symphony.k8s.aws
+  name: constructs.x.symphony.k8s.aws
 spec:
   group: x.symphony.k8s.aws
   names:
-    kind: Abstraction
-    listKind: AbstractionList
-    plural: abstractions
-    singular: abstraction
+    kind: Construct
+    listKind: ConstructList
+    plural: constructs
+    singular: construct
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Abstraction is the Schema for the abstractions API
+        description: Construct is the Schema for the constructs API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -32,7 +32,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: AbstractionSpec defines the desired state of Abstraction
+            description: ConstructSpec defines the desired state of Construct
             properties:
               apiVersion:
                 type: string
@@ -63,7 +63,7 @@ spec:
                 type: array
             type: object
           status:
-            description: AbstractionStatus defines the observed state of Abstraction
+            description: ConstructStatus defines the observed state of Construct
             type: object
         type: object
     served: true

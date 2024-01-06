@@ -12,24 +12,24 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// This package is reponsible of parsing the Abstraction field spec and building the Resource Graph.
+// This package is reponsible of parsing the Construct field spec and building the Resource Graph.
 // It uses the spec.resources field to understand the relationships between resources.
 // One of the main challenges is that resources could be of any types, and the relationships between them
 // is described using CEL expressions.
 
-// The Abstraction node is root of the Resource Graph.
-// Other resources can easily consume any spec/metadata/labels/annotations from the Abstraction node.
-// The abstraction node is provided by the user, and it is not created by the controller.
+// The Construct node is root of the Resource Graph.
+// Other resources can easily consume any spec/metadata/labels/annotations from the Construct node.
+// The construct node is provided by the user, and it is not created by the controller.
 
-// Other resources are called "children" of the Abstraction node.
-// They can consume data from the Abstraction node, and they can also consume data from other children.
+// Other resources are called "children" of the Construct node.
+// They can consume data from the Construct node, and they can also consume data from other children.
 // There two situations where a child can consume data from another child:
 // 1. The child is consuming a spec field from another child.
 // 2. The child is consuming a status field another child.
 
 type Collection struct {
-	Abstraction *Resource
-	Resources   []*Resource
+	Construct *Resource
+	Resources []*Resource
 }
 
 func parseDataWithYQ(raw []byte, path string) (string, error) {
@@ -42,26 +42,34 @@ func (c *Collection) GetReplaceData() (map[string]string, error) {
 	replaceData := make(map[string]string)
 	for _, resource := range c.Resources {
 		for _, ref := range resource.References {
-			if ref.Type == ReferenceTypeSpec {
-				uniData, err := parseDataCELFake(c.Abstraction.Raw, ref.JSONPath)
+			switch ref.Type {
+			case ReferenceTypeSpec, ReferenceTypeMetadata, ReferenceTypeAnnotation:
+				uniData, err := parseDataCELFake(c.Construct.Raw, ref.Name)
 				if err != nil {
 					return nil, err
 				}
-				replaceData[ref.JSONPath] = uniData
-			} else if ref.Type == ReferenceTypeResource {
+				fmt.Println("USING CEL", ref.Name)
+				fmt.Println("ON", string(c.Construct.Raw))
+				fmt.Println("---")
+				replaceData[ref.Name] = uniData
+			case ReferenceTypeResource:
 				target, ok := ref.getTargetResource(c.Resources)
 				if !ok {
 					return nil, fmt.Errorf("Not found")
 				}
-				parts := strings.Split(ref.JSONPath, ".")
+				parts := strings.Split(ref.Name, ".")
 				parts[0] = "definition"
 				jsonPath := strings.Join(parts, ".")
 
+				fmt.Println("USING CEL", jsonPath)
+				fmt.Println("ON", string(target.Raw))
+				fmt.Println("---")
 				uniData, err := parseDataCELFake(target.Raw, jsonPath)
 				if err != nil {
 					return nil, err
 				}
 				replaceData[ref.JSONPath] = uniData
+			default:
 			}
 		}
 	}
@@ -108,11 +116,11 @@ func (r *Resource) WithReplacedReferences(data map[string]string) *Resource {
 
 type Builder struct{}
 
-func (b *Builder) Build(rawAbstraction runtime.RawExtension, abstractionResources []*v1alpha1.Resource) (*Collection, error) {
+func (b *Builder) Build(rawConstruct runtime.RawExtension, constructResources []*v1alpha1.Resource) (*Collection, error) {
 	// Start by walking through the resources and build a map of resources.
 	// This map will be used to quickly access a resource by its name.
-	resources := make([]*Resource, 0, len(abstractionResources))
-	for _, resource := range abstractionResources {
+	resources := make([]*Resource, 0, len(constructResources))
+	for _, resource := range constructResources {
 		var data map[string]interface{}
 		err := yaml.Unmarshal(resource.Definition.Raw, &data)
 		if err != nil {
@@ -145,7 +153,7 @@ func (b *Builder) Build(rawAbstraction runtime.RawExtension, abstractionResource
 				return nil, fmt.Errorf("couldn't build variable %s: %v", ref, err)
 			}
 			resource.References = append(resource.References, references)
-			// If the variable is targetting the Abstraction node, we don't need to do anything.
+			// If the variable is targetting the Construct node, we don't need to do anything.
 			if references.Type == ReferenceTypeResource {
 				targetResource, ok := references.getTargetResource(resources)
 				if !ok {
@@ -160,11 +168,11 @@ func (b *Builder) Build(rawAbstraction runtime.RawExtension, abstractionResource
 		}
 	}
 
-	// Now just unmarshal the abstraction data.
-	var abstractionData map[string]interface{}
-	err = yaml.Unmarshal(rawAbstraction.Raw, &abstractionData)
+	// Now just unmarshal the construct data.
+	var constructData map[string]interface{}
+	err = yaml.Unmarshal(rawConstruct.Raw, &constructData)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse yaml data from abstraction %v", err)
+		return nil, fmt.Errorf("couldn't parse yaml data from construct %v", err)
 	}
 
 	// Validate that there is no cyclic dependencies.
@@ -177,9 +185,9 @@ func (b *Builder) Build(rawAbstraction runtime.RawExtension, abstractionResource
 
 	collection := &Collection{
 		Resources: resources,
-		Abstraction: &Resource{
+		Construct: &Resource{
 			Name:           "main",
-			Data:           abstractionData,
+			Data:           constructData,
 			ReferenceNames: []string{},
 			DependsOn:      []string{},
 			References:     []*Reference{},

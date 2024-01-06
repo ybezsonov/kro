@@ -1,44 +1,85 @@
 package cel
 
 import (
-	"fmt"
-
 	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types/ref"
+	"github.com/wzshiming/easycel"
 )
 
-type Engine struct {
-	env *cel.Env
+const (
+	claimToken     = "claim"
+	resourcesToken = "resources"
+)
+
+type SymphonyEngine struct {
+	claim     map[string]interface{}
+	resources map[string]map[string]interface{}
+	registry  *easycel.Registry
+	env       *easycel.Environment
 }
 
-func NewEngine() *Engine {
-	return &Engine{}
+func NewEngine() (*SymphonyEngine, error) {
+	registry := easycel.NewRegistry("symphony-cel-engine", easycel.WithTagName("json"))
+
+	// instantly register the two variables we know we'll need
+	err := registry.RegisterVariable(claimToken, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+	err = registry.RegisterVariable(resourcesToken, map[string]interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	env, err := easycel.NewEnvironment(cel.Lib(registry))
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make(map[string]map[string]interface{})
+
+	return &SymphonyEngine{
+		resources: resources,
+		registry:  registry,
+		env:       env,
+	}, nil
 }
 
-func (e *Engine) Eval(exp string, input map[string]any) (*EvalResponse, error) {
-	inputVars := make([]cel.EnvOption, 0, len(input))
-	for k := range input {
-		inputVars = append(inputVars, cel.Variable(k, cel.DynType))
-	}
-	env, err := cel.NewEnv(append(celEnvOptions, inputVars...)...)
+func (se *SymphonyEngine) SetClaim(claim map[string]interface{}) {
+	se.claim = claim
+}
+
+func (se *SymphonyEngine) SetResource(name string, resource map[string]interface{}) {
+	se.resources[name] = resource
+}
+
+func (se *SymphonyEngine) EvalClaim(expression string) (ref.Val, error) {
+	prog, err := se.env.Program(claimToken + "." + expression)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create CEL env: %w", err)
+		return nil, err
 	}
-	ast, issues := env.Compile(exp)
-	if issues != nil {
-		return nil, fmt.Errorf("failed to compile the CEL expression: %s", issues.String())
-	}
-	prog, err := env.Program(ast, celProgramOptions...)
+	val, _, err := prog.Eval(map[string]interface{}{
+		claimToken: se.claim,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to instantiate CEL program: %w", err)
-	}
-	val, costTracker, err := prog.Eval(input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate: %w", err)
+		return nil, err
 	}
 
-	response, err := generateResponse(val, costTracker)
+	return val, nil
+}
+
+// TODO Add a paramter to specify the resource name
+func (se *SymphonyEngine) EvalResource(expression string) (ref.Val, error) {
+	prog, err := se.env.Program("resources" + "." + expression)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate the response: %w", err)
+		return nil, err
 	}
-	return response, nil
+	val, _, err := prog.Eval(map[string]interface{}{
+		resourcesToken: se.resources,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return val, nil
 }
