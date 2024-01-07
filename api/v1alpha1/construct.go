@@ -59,7 +59,7 @@ type ConstructStatus struct {
 	// TopologicalOrder is the topological order of the construct graph
 	TopoligicalOrder []string `json:"creationOrder,omitempty"`
 	// Conditions represent the latest available observations of an object's state
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions []Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/symphony/internal/construct"
 	"github.com/aws/symphony/internal/requeue"
@@ -110,28 +111,32 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 
 		// Check if resource exists
 		observed, err := rc.Get(ctx, rname, metav1.GetOptions{})
-		fmt.Println("             => getting resource. err", err.Error(), gvr)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
+				fmt.Println("             => resource not found, creating")
 				_, err := rc.Create(ctx, rUnstructured, metav1.CreateOptions{})
-				fmt.Println("             => creating...", err.Error(), gvr)
 				b, _ := rUnstructured.MarshalJSON()
 				fmt.Println(string(b))
 				if err != nil {
 					return err
 				}
+				fmt.Println("             => resource created")
+				fmt.Println("             => setting state to creating")
 				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateCreating)
 			} else {
 				return err
 			}
 		}
+		fmt.Println("             => resource found..")
 		if observed != nil {
 			observedStatus, ok := observed.Object["status"]
+			fmt.Println("             => resource has status", ok)
 			if ok {
 				err := resource.SetStatus(observedStatus.(map[string]interface{}))
 				if err != nil {
 					return err
 				}
+				fmt.Println("             => resource status set TO READY")
 				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
 				// ...
 				err = o.mainGraph.ResolvedVariables()
@@ -146,8 +151,10 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		}
 	}
 	if !o.stateTracker.AllReady() {
-		return requeue.NeededAfter(fmt.Errorf("not all resources are ready"), 5)
+		fmt.Println("     => not all resources are ready")
+		return requeue.NeededAfter(fmt.Errorf("not all resources are ready"), 5*time.Second)
 	}
+	fmt.Println("     => all resources are ready. done")
 
 	return nil
 }

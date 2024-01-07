@@ -7,33 +7,33 @@ import (
 )
 
 // NewCondition returns a new Condition instance.
-func NewCondition(t v1alpha1.ConditionType, status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+func NewCondition(t v1alpha1.ConditionType, status corev1.ConditionStatus, reason, message string) v1alpha1.Condition {
 	return v1alpha1.Condition{
 		Type:               t,
 		Status:             status,
-		LastTransitionTime: &metav1.Time{},
-		Reason:             reason,
-		Message:            message,
+		LastTransitionTime: &metav1.Time{Time: metav1.Now().Time},
+		Reason:             &reason,
+		Message:            &message,
 	}
 }
 
-func NewTerminalCondition(status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+func NewTerminalCondition(status corev1.ConditionStatus, reason, message string) v1alpha1.Condition {
 	return NewCondition(v1alpha1.ConditionTypeTerminal, status, reason, message)
 }
 
-func NewResourceSyncedCondition(status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+func NewResourceSyncedCondition(status corev1.ConditionStatus, reason, message string) v1alpha1.Condition {
 	return NewCondition(v1alpha1.ConditionTypeResourceSynced, status, reason, message)
 }
 
-func NewReconcilerReadyCondition(status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+func NewReconcilerReadyCondition(status corev1.ConditionStatus, reason, message string) v1alpha1.Condition {
 	return NewCondition(v1alpha1.ConditionTypeReconcilerReady, status, reason, message)
 }
 
-func NewAdvisoryCondition(status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+func NewAdvisoryCondition(status corev1.ConditionStatus, reason, message string) v1alpha1.Condition {
 	return NewCondition(v1alpha1.ConditionTypeAdvisory, status, reason, message)
 }
 
-func NewGraphSyncedCondition(status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+func NewGraphSyncedCondition(status corev1.ConditionStatus, reason, message string) v1alpha1.Condition {
 	return NewCondition(v1alpha1.ConditionTypeGraphSynced, status, reason, message)
 }
 

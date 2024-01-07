@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
@@ -27,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/aws/symphony/api/v1alpha1"
-	xv1alpha1 "github.com/aws/symphony/api/v1alpha1"
+	"github.com/aws/symphony/internal/condition"
 	"github.com/aws/symphony/internal/crd"
 	"github.com/aws/symphony/internal/dynamiccontroller"
 	"github.com/aws/symphony/internal/finalizer"
@@ -135,6 +136,10 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		&construct,
 	)
 	if err != nil {
+		if err := r.setStatusInactive(ctx, &construct, err); err != nil {
+			log.Info("unable to set status inactive")
+			return ctrl.Result{}, err
+		}
 		log.Info("unable to register workflow operator")
 		return ctrl.Result{}, err
 	}
@@ -146,6 +151,11 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Info("unable to set managed")
 		return ctrl.Result{}, err
 	}
+	err = r.setStatusActive(ctx, &construct)
+	if err != nil {
+		log.Info("unable to set status active")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -153,7 +163,7 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 // SetupWithManager sets up the controller with the Manager.
 func (r *ConstructReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&xv1alpha1.Construct{}).
+		For(&v1alpha1.Construct{}).
 		Complete(r)
 }
 
@@ -161,12 +171,67 @@ func (r *ConstructReconciler) setManaged(ctx context.Context, construct *v1alpha
 	newFinalizers := finalizer.AddSymphonyFinalizer(construct)
 	dc := construct.DeepCopy()
 	dc.Finalizers = newFinalizers
-	return r.Update(ctx, dc)
+	if len(dc.Finalizers) != len(construct.Finalizers) {
+		fmt.Println("  => setting finalizers to: ", newFinalizers)
+		patch := client.MergeFrom(construct.DeepCopy())
+		return r.Patch(ctx, dc.DeepCopy(), patch)
+	}
+	return nil
+}
+
+func (r *ConstructReconciler) setStatusActive(ctx context.Context, construct *v1alpha1.Construct) error {
+	dc := construct.DeepCopy()
+	dc.Status.State = "ACTIVE"
+	conditions := dc.Status.Conditions
+	newConditions := condition.SetCondition(conditions,
+		condition.NewReconcilerReadyCondition(
+			corev1.ConditionTrue,
+			"",
+			"micro controller is ready",
+		),
+	)
+	newConditions = condition.SetCondition(newConditions,
+		condition.NewGraphSyncedCondition(
+			corev1.ConditionTrue,
+			"",
+			"Directed Acyclic Graph is synced",
+		),
+	)
+	dc.Status.Conditions = newConditions
+	patch := client.MergeFrom(construct.DeepCopy())
+	// data, _ := patch.Data(dc)
+	return r.Status().Patch(ctx, dc.DeepCopy(), patch)
+}
+
+func (r *ConstructReconciler) setStatusInactive(ctx context.Context, construct *v1alpha1.Construct, err error) error {
+	dc := construct.DeepCopy()
+	dc.Status.State = "INACTIVE"
+	conditions := dc.Status.Conditions
+	newConditions := condition.SetCondition(conditions,
+		condition.NewReconcilerReadyCondition(
+			corev1.ConditionTrue,
+			"",
+			"micro controller is ready",
+		),
+	)
+	newConditions = condition.SetCondition(newConditions,
+		condition.NewGraphSyncedCondition(
+			corev1.ConditionTrue,
+			err.Error(),
+			"Directed Acyclic Graph is not synced",
+		),
+	)
+	dc.Status.Conditions = newConditions
+	patch := client.MergeFrom(construct.DeepCopy())
+	// data, _ := patch.Data(dc)
+	return r.Status().Patch(ctx, dc.DeepCopy(), patch)
 }
 
 func (r *ConstructReconciler) setUnmanaged(ctx context.Context, construct *v1alpha1.Construct) error {
 	newFinalizers := finalizer.RemoveSymphonyFinalizer(construct)
 	dc := construct.DeepCopy()
 	dc.Finalizers = newFinalizers
-	return r.Update(ctx, dc)
+	fmt.Println("  => unsetting finalizers to: ", newFinalizers)
+	patch := client.MergeFrom(construct.DeepCopy())
+	return r.Patch(ctx, dc.DeepCopy(), patch)
 }

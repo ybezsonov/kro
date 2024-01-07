@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/symphony/api/v1alpha1"
 	"github.com/aws/symphony/internal/construct"
+	"github.com/aws/symphony/internal/requeue"
 	"github.com/aws/symphony/internal/workflow"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
@@ -122,18 +123,21 @@ func (cc *DynamicController) processNextWorkItem(ctx context.Context) bool {
 	defer cc.queue.Done(item)
 
 	itemUnwrapper := item.(ObjectIdentifiers)
-	if err := cc.syncFunc(ctx, itemUnwrapper); err != nil {
-		cc.queue.AddRateLimited(item)
-		if err != nil {
+	err := cc.syncFunc(ctx, itemUnwrapper)
+	fmt.Println("    => DC syncFunc err", err)
+	if err != nil {
+		if reqErr, ok := err.(*requeue.RequeueNeededAfter); ok {
+			cc.queue.AddAfter(item, reqErr.Duration())
+		} else {
 			gvrKey := fmt.Sprintf("%s/%s/%s/%s", itemUnwrapper.GVR.Group, itemUnwrapper.GVR.Version, itemUnwrapper.GVR.Resource, itemUnwrapper.Key)
 			utilruntime.HandleError(fmt.Errorf("sync %v failed with : %v", gvrKey, err))
 		}
 		return true
 	}
 
+	fmt.Println("    => forgetting item", itemUnwrapper.Key)
 	cc.queue.Forget(item)
 	return true
-
 }
 
 type ObjectIdentifiers struct {
@@ -147,7 +151,7 @@ func (cc *DynamicController) enqueueObject(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-	// obj is a claim of a defined construct, we do not have an idea of the construct name
+	// obj is a claim of a defined construct, we do not know much about the contruct
 	// so we enqueue two things:
 	//   - the claim key (namespacedName)
 	//   - the GVR of the claim (this will be usefull to know which handler to call)
@@ -229,32 +233,40 @@ func (dc *DynamicController) SafeRegisterGVK(gvr schema.GroupVersionResource) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	if _, ok := dc.informers[gvr]; !ok {
-		gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 5*time.Second, metav1.NamespaceAll, nil)
+		gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, metav1.NamespaceAll, nil)
 		gvkInformer.ForResource(gvr).Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				dc.log.Info("Adding object")
 				dc.enqueueObject(obj)
 			},
 			UpdateFunc: func(old, new interface{}) {
+				// marshall old and new to json and compare them
+				oldJSON, _ := old.(*unstructured.Unstructured).MarshalJSON()
+				newJSON, _ := new.(*unstructured.Unstructured).MarshalJSON()
+				if string(oldJSON) == string(newJSON) {
+					fmt.Println("WEIRD: old and new are the same")
+					return
+				}
+
 				dc.log.Info("Updating object")
 				dc.enqueueObject(new)
 			},
 			DeleteFunc: func(obj interface{}) {
-				/* 				csr, ok := obj.(*certificates.CertificateSigningRequest)
-				   				if !ok {
-				   					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-				   					if !ok {
-				   						dc.log.V(2).Info("Couldn't get object from tombstone", "object", obj)
-				   						return
-				   					}
-				   					csr, ok = tombstone.Obj.(*certificates.CertificateSigningRequest)
-				   					if !ok {
-				   						dc.log.V(2).Info("Tombstone contained object that is not a CSR", "object", obj)
-				   						return
-				   					}
-				   				} */
+				uu, ok := obj.(*unstructured.Unstructured)
+				if !ok {
+					tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+					if !ok {
+						dc.log.V(2).Info("Couldn't get object from tombstone", "object", obj)
+						return
+					}
+					uu, ok = tombstone.Obj.(*unstructured.Unstructured)
+					if !ok {
+						dc.log.V(2).Info("Tombstone contained object that is not an unstructured obj", "object", obj)
+						return
+					}
+				}
 				dc.log.Info("Deleting object")
-				dc.enqueueObject(obj)
+				dc.enqueueObject(uu)
 			},
 		})
 		dc.informers[gvr] = gvkInformer
