@@ -31,6 +31,14 @@ func (g *Graph) GetResource(runtimeID string) (*Resource, error) {
 	return nil, fmt.Errorf("resource not found")
 }
 
+func (g *Graph) OrderedResourceList() []string {
+	var list []string
+	for _, r := range g.Resources {
+		list = append(list, r.RuntimeID)
+	}
+	return list
+}
+
 func NewGraph(constructResources []v1alpha1.Resource) (*Graph, error) {
 	// Start by walking through the resources and build a map of resources.
 	// This map will be used to quickly access a resource by its name.
@@ -81,7 +89,7 @@ func NewGraph(constructResources []v1alpha1.Resource) (*Graph, error) {
 	}
 	// Validate that there are no cyclic dependencies.
 	for _, resource := range resources {
-		err := detectCyclicDependencies(resource, resources, make(map[string]bool))
+		err := detectCyclicDependencies(resource, resources, make(map[string]bool), resource.RuntimeID)
 		if err != nil {
 			return nil, err
 		}
@@ -228,15 +236,15 @@ func getVariableResourceRef(variable string, resources []*Resource) (*Resource, 
 }
 
 // detectCyclicDependencies is a recursive function that detects cyclic dependencies between resources.
-func detectCyclicDependencies(resource *Resource, resources []*Resource, seen map[string]bool) error {
+func detectCyclicDependencies(resource *Resource, resources []*Resource, seen map[string]bool, path string) error {
 	seen[resource.RuntimeID] = true
 	for _, dependency := range resource.Dependencies {
 		if seen[dependency.RuntimeID] {
-			return fmt.Errorf("cyclic dependency detected: %s -> %s", resource.RuntimeID, dependency)
+			return fmt.Errorf("circular dependency detected: %s", path)
 		}
 		for _, r := range resources {
 			if r.RuntimeID == dependency.RuntimeID {
-				err := detectCyclicDependencies(r, resources, seen)
+				err := detectCyclicDependencies(r, resources, seen, path+" -> "+r.RuntimeID)
 				if err != nil {
 					return err
 				}
@@ -261,7 +269,7 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 				case VariableKindClaimSpecRefrence:
 					variableValue, err := resolver.ResolverFromClaim(trimedExpression)
 					if err != nil {
-						return nil, fmt.Errorf("couldn't resolve claim variable: %v: %v", trimedExpression, err)
+						return nil, fmt.Errorf("couldn't resolve claim variable: '%v': '%v'", trimedExpression, err)
 					}
 					variable.ResolvedValue = variableValue
 				case VariableKindResourceSpecReference:
@@ -272,6 +280,7 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 					variable.ResolvedValue = variableValue
 
 				case VariableKindResourceStatusReference:
+					fmt.Println("  => variableKind: ", variable.Kind)
 					targetResource, err := g.GetResource(variable.SrcRef.RuntimeID)
 					if err != nil {
 						return nil, fmt.Errorf("!!! couldn't resolve resource variable: %v: %v", trimedExpression, err)
@@ -282,6 +291,7 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 							return nil, fmt.Errorf("couldn't resolve resource variable: %v: %v", trimedExpression, err)
 						}
 						variable.ResolvedValue = variableValue
+						fmt.Println("  => variableValue: ", variableValue)
 					}
 				}
 			}
@@ -296,6 +306,7 @@ func (r *Resource) ApplyResolvedVariables() error {
 	for _, variable := range r.Variables {
 		if variable.Type == VariableTypeStaticReference {
 			if variable.ResolvedValue != nil {
+				fmt.Println("Applyinh value: ", variable.Expression, variable.ResolvedValue)
 				switch v := variable.ResolvedValue.(type) {
 				case string:
 					vars[variable.Expression] = v
@@ -308,6 +319,8 @@ func (r *Resource) ApplyResolvedVariables() error {
 		}
 	}
 
+	fmt.Println("  => vars: ", vars)
+
 	r.Raw = r.replaceVariables(vars)
 	var newData map[string]interface{}
 	err := yaml.Unmarshal(r.Raw, &newData)
@@ -315,6 +328,8 @@ func (r *Resource) ApplyResolvedVariables() error {
 		return err
 	}
 	r.Data = newData
+
+	fmt.Println("  => new data: ", r.Data)
 	return nil
 }
 

@@ -26,8 +26,8 @@ import (
 	"k8s.io/client-go/dynamic/dynamiclister"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type DynamicController struct {
@@ -66,7 +66,7 @@ func NewDynamicController(
 	kubeClient *dynamic.DynamicClient,
 	handler func(context.Context, ctrl.Request) error,
 ) *DynamicController {
-	logger := klog.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	// wo := workflow.NewOperator(schema.GroupVersionResource{}, nil, nil)
 
 	dc := &DynamicController{
@@ -93,7 +93,7 @@ func (cc *DynamicController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer cc.queue.ShutDown()
 
-	logger := klog.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	logger.Info("Starting symphony dynamic controller", "name", cc.name)
 	defer logger.Info("Shutting symphony dynamic controller", "name", cc.name)
 
@@ -190,7 +190,7 @@ func (cc *DynamicController) enqueueObject(obj interface{}) {
 }
 
 func (cc *DynamicController) syncFunc(ctx context.Context, oi ObjectIdentifiers) error {
-	logger := klog.FromContext(ctx)
+	logger := log.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
 		logger.Info("Finished syncing construct claim request", "elapsedTime", time.Since(startTime))
@@ -285,7 +285,15 @@ func (dc *DynamicController) UnregisterGVK(gvr schema.GroupVersionResource) {
 	dc.log.Info("Unregistering GVK", "gvr", gvr)
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
-	delete(dc.informers, gvr)
+	informer, ok := dc.informers[gvr]
+	if ok {
+		// dc.log.Info("Stopping informer", "gvr", gvr)
+		dc.cancelFuncs[gvr]()
+		informer.Shutdown()
+		// dc.log.Info("Deleting informer", "gvr", gvr)
+		delete(dc.informers, gvr)
+	}
+	dc.log.Info("Stop informers for GVK", "gvr", gvr)
 }
 
 func (cc *DynamicController) HotRestart() bool {
@@ -293,11 +301,15 @@ func (cc *DynamicController) HotRestart() bool {
 	return true
 }
 
-func (dc *DynamicController) RegisterWorkflowOperator(ctx context.Context, gvr schema.GroupVersionResource, c *v1alpha1.Construct) error {
+func (dc *DynamicController) RegisterWorkflowOperator(
+	ctx context.Context,
+	gvr schema.GroupVersionResource,
+	c *v1alpha1.Construct,
+) ([]string, error) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 
-	dc.log.Info("Creating construct graph", c.Name)
+	dc.log.Info("Creating construct graph", "name", c.Name)
 	resources := make([]v1alpha1.Resource, 0)
 	for _, resource := range c.Spec.Resources {
 		resources = append(resources, *resource)
@@ -305,14 +317,19 @@ func (dc *DynamicController) RegisterWorkflowOperator(ctx context.Context, gvr s
 
 	graph, err := construct.NewGraph(resources)
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	err = graph.TopologicalSort()
+	if err != nil {
+		return nil, err
 	}
 
 	dc.log.Info("Creating workflow operator", "gvr", gvr)
 	wo := workflow.NewOperator(ctx, gvr, graph, dc.kubeClient)
 	dc.workflowOperators[gvr] = wo
 	fmt.Println("    => Operators count", len(dc.workflowOperators))
-	return nil
+	return graph.OrderedResourceList(), nil
 }
 
 func (dc *DynamicController) UnregisterWorkflowOperator(gvr schema.GroupVersionResource) {

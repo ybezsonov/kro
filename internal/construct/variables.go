@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	referencesRegex = regexp.MustCompile(`\$\{.*\}`)
+	referencesRegex = regexp.MustCompile(`\$\{[a-zA-Z0-9\.\-]*\}`)
 )
 
 func extractVariables(raw []byte) ([]*Variable, error) {

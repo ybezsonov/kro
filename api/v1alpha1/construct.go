@@ -57,7 +57,7 @@ type ConstructStatus struct {
 	// GraphState is the state of the construct graph
 	GraphState string `json:"graphState,omitempty"`
 	// TopologicalOrder is the topological order of the construct graph
-	TopoligicalOrder []string `json:"creationOrder,omitempty"`
+	TopoligicalOrder []string `json:"topologicalOrder,omitempty"`
 	// Conditions represent the latest available observations of an object's state
 	Conditions []Condition `json:"conditions,omitempty"`
 }

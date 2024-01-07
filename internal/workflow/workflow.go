@@ -8,12 +8,13 @@ import (
 
 	"github.com/aws/symphony/internal/construct"
 	"github.com/aws/symphony/internal/requeue"
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // This package transforms the Resource Graph into a Workflow matrix.
@@ -25,7 +26,7 @@ func NewOperator(
 	g *construct.Graph,
 	client *dynamic.DynamicClient,
 ) *Operator {
-	log := klog.FromContext(ctx)
+	log := log.FromContext(ctx)
 	return &Operator{
 		id:           fmt.Sprintf("operator.%s/%s/%s", target.Group, target.Version, target.Resource),
 		log:          &log,
@@ -40,7 +41,7 @@ func NewOperator(
 type Operator struct {
 	// mu            sync.RWMutex
 	id            string
-	log           *klog.Logger
+	log           *logr.Logger
 	target        schema.GroupVersionResource
 	client        *dynamic.DynamicClient
 	mainGraph     *construct.Graph
@@ -97,11 +98,13 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 			return requeue.NeededAfter(fmt.Errorf("resource dependencies not ready"), 5)
 		}
 
+		gvr := resource.GVR()
+
 		rUnstructured := resource.Unstructured()
+
 		rname := rUnstructured.GetName()
 		fmt.Println("             => resource name: ", rname)
 
-		gvr := resource.GVR()
 		namespace := rUnstructured.GetNamespace()
 		if namespace == "" {
 			namespace = "default"
@@ -123,6 +126,8 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				fmt.Println("             => resource created")
 				fmt.Println("             => setting state to creating")
 				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateCreating)
+				// fmt.Println("             => requeueing")
+				// return requeue.NeededAfter(fmt.Errorf("resource created"), 5*time.Second)
 			} else {
 				return err
 			}
@@ -132,6 +137,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 			observedStatus, ok := observed.Object["status"]
 			fmt.Println("             => resource has status", ok)
 			if ok {
+				fmt.Println("             => setting status", observedStatus)
 				err := resource.SetStatus(observedStatus.(map[string]interface{}))
 				if err != nil {
 					return err
@@ -147,6 +153,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				if err != nil {
 					return err
 				}
+				fmt.Println("			 => raw data: ", resource.Data)
 			}
 		}
 	}

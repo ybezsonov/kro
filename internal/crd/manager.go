@@ -24,10 +24,29 @@ func NewManager(Client *apiextensionsv1.ApiextensionsV1Client) *Manager {
 }
 
 func (m *Manager) Create(ctx context.Context, crd v1.CustomResourceDefinition) error {
+	crd.OwnerReferences = []metav1.OwnerReference{
+		{
+			Name:       "symphony-controller",
+			Kind:       "Construct",
+			APIVersion: "x.symphony.k8s.aws/v1alpha1",
+			Controller: &[]bool{false}[0],
+			UID:        "00000000-0000-0000-0000-000000000000",
+		},
+	}
+
 	_, err := m.Client.CustomResourceDefinitions().Create(
 		ctx,
 		&crd,
 		metav1.CreateOptions{},
+	)
+	return err
+}
+
+func (m *Manager) Update(ctx context.Context, crd v1.CustomResourceDefinition) error {
+	_, err := m.Client.CustomResourceDefinitions().Update(
+		ctx,
+		&crd,
+		metav1.UpdateOptions{},
 	)
 	return err
 }
@@ -40,9 +59,14 @@ func (m *Manager) Ensure(ctx context.Context, crd v1.CustomResourceDefinition) e
 		if strings.Contains(err.Error(), "not found") {
 			return m.Create(ctx, crd)
 		}
-		fmt.Println("CRD already exists")
+		return err
 	}
-	return err
+
+	/* 	dc := crd.DeepCopy()
+	   	patch := client.MergeFrom(og.DeepCopy())
+	   	dt, _ := patch.Data(dc)
+	   	_, err = m.Client.CustomResourceDefinitions().Patch(ctx, dc.Name, types.StrategicMergePatchType, dt, metav1.PatchOptions{}) */
+	return nil
 }
 
 func (m *Manager) Describe(ctx context.Context, name string) (*v1.CustomResourceDefinition, error) {

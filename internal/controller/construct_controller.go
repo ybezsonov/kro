@@ -23,9 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws/symphony/api/v1alpha1"
 	"github.com/aws/symphony/internal/condition"
@@ -58,13 +58,12 @@ type ConstructReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := klog.FromContext(ctx)
+	log := log.FromContext(ctx)
 	log.Info("Reconciling", "resource", req.NamespacedName)
 
 	var construct v1alpha1.Construct
 	err := r.Get(ctx, req.NamespacedName, &construct)
 	if err != nil {
-		log.Error(err, "unable to fetch Construct object")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -111,6 +110,11 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// Handle deletions
 	if !construct.ObjectMeta.DeletionTimestamp.IsZero() {
 		log.Info("construct is deleted")
+		err := r.CRDManager.Delete(ctx, customRD.Name)
+		if err != nil {
+			log.Info("unable to delete CRD")
+			return ctrl.Result{}, err
+		}
 		log.Info("Unregistering GVK in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
 		r.DynamicController.UnregisterGVK(gvr)
 		log.Info("Unregistering workflow operator in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
@@ -130,7 +134,7 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	r.DynamicController.SafeRegisterGVK(gvr)
 
 	log.Info("Registering workflow operator in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvrStr)
-	err = r.DynamicController.RegisterWorkflowOperator(
+	orderedResources, err := r.DynamicController.RegisterWorkflowOperator(
 		ctx,
 		gvr,
 		&construct,
@@ -141,7 +145,7 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return ctrl.Result{}, err
 		}
 		log.Info("unable to register workflow operator")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, nil
 	}
 
 	// Set managed
@@ -151,7 +155,7 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		log.Info("unable to set managed")
 		return ctrl.Result{}, err
 	}
-	err = r.setStatusActive(ctx, &construct)
+	err = r.setStatusActive(ctx, &construct, orderedResources)
 	if err != nil {
 		log.Info("unable to set status active")
 		return ctrl.Result{}, err
@@ -179,9 +183,12 @@ func (r *ConstructReconciler) setManaged(ctx context.Context, construct *v1alpha
 	return nil
 }
 
-func (r *ConstructReconciler) setStatusActive(ctx context.Context, construct *v1alpha1.Construct) error {
+func (r *ConstructReconciler) setStatusActive(
+	ctx context.Context, construct *v1alpha1.Construct, orderedResources []string,
+) error {
 	dc := construct.DeepCopy()
 	dc.Status.State = "ACTIVE"
+	dc.Status.TopoligicalOrder = orderedResources
 	conditions := dc.Status.Conditions
 	newConditions := condition.SetCondition(conditions,
 		condition.NewReconcilerReadyCondition(
@@ -216,7 +223,7 @@ func (r *ConstructReconciler) setStatusInactive(ctx context.Context, construct *
 	)
 	newConditions = condition.SetCondition(newConditions,
 		condition.NewGraphSyncedCondition(
-			corev1.ConditionTrue,
+			corev1.ConditionFalse,
 			err.Error(),
 			"Directed Acyclic Graph is not synced",
 		),
