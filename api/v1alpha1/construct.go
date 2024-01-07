@@ -52,6 +52,14 @@ type Resource struct {
 
 // ConstructStatus defines the observed state of Construct
 type ConstructStatus struct {
+	// State is the state of the construct
+	State string `json:"state,omitempty"`
+	// GraphState is the state of the construct graph
+	GraphState string `json:"graphState,omitempty"`
+	// TopologicalOrder is the topological order of the construct graph
+	TopoligicalOrder []string `json:"creationOrder,omitempty"`
+	// Conditions represent the latest available observations of an object's state
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

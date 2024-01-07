@@ -15,6 +15,13 @@ type Graph struct {
 	Resources []*Resource
 }
 
+func (g *Graph) CopyWithNewClaim(claim Claim) *Graph {
+	return &Graph{
+		Claim:     claim,
+		Resources: copyResources(g.Resources),
+	}
+}
+
 func (g *Graph) GetResource(runtimeID string) (*Resource, error) {
 	for _, r := range g.Resources {
 		if r.RuntimeID == runtimeID {
@@ -150,7 +157,7 @@ func (g *Graph) topologicalSort() ([]*Resource, error) {
 	return result, nil
 }
 
-// Parse the resources and determines the order in which they should be created.
+// Parse the resources and determines the order in which they should be created/managed.
 func (g *Graph) getCreationOrder() ([]*Resource, error) {
 	orderedResources := make([]*Resource, 0, len(g.Resources))
 	appended := make(map[string]bool)

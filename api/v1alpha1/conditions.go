@@ -21,6 +21,9 @@ const (
 	ConditionTypeTerminal ConditionType = "symphony.aws.dev/Terminal"
 	// ConditionTypeAdvisory indicates any advisory info that may be present in the resource.
 	ConditionTypeAdvisory ConditionType = "symphony.aws.dev/Advisory"
+	// ConditionTypeGraphSynced indicates the state of the graph in the
+	// in kubernetes cluster.
+	ConditionTypeGraphSynced ConditionType = "symphony.aws.dev/GraphSynced"
 )
 
 // Condition is the common struct used by all CRDs managed by ACK service

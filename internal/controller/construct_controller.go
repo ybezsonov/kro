@@ -18,17 +18,19 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws/symphony/api/v1alpha1"
 	xv1alpha1 "github.com/aws/symphony/api/v1alpha1"
 	"github.com/aws/symphony/internal/crd"
 	"github.com/aws/symphony/internal/dynamiccontroller"
+	"github.com/aws/symphony/internal/finalizer"
 	openapischema "github.com/aws/symphony/internal/schema"
 )
 
@@ -55,7 +57,7 @@ type ConstructReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	log := klog.FromContext(ctx)
 	log.Info("Reconciling", "resource", req.NamespacedName)
 
 	var construct v1alpha1.Construct
@@ -65,11 +67,9 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Handle deletions
-	if !construct.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("construct is deleted")
-		return ctrl.Result{}, nil
-	}
+	log.Info("Got construct from the api server", "name", req.NamespacedName)
+
+	log.Info("Transforming construct definition to OpenAPIv3 schema", "name", req.NamespacedName)
 
 	// Handle creation
 	oaSchema, err := r.OpenAPISchema.Transform(construct.Spec.Definition.Spec.Raw)
@@ -94,19 +94,58 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	   	}
 	   	fmt.Println(string(bb)) */
 
+	log.Info("Creating custom resource definition", "crd_name", customRD.Name)
 	err = r.CRDManager.Ensure(ctx, customRD)
 	if err != nil {
 		log.Info("unable to ensure CRD")
 		return ctrl.Result{}, err
 	}
 
-	r.DynamicController.SafeRegisterGVK(
-		schema.GroupVersionResource{
-			Group:    customRD.Spec.Group,
-			Version:  customRD.Spec.Versions[0].Name,
-			Resource: customRD.Spec.Names.Plural,
-		},
+	gvr := schema.GroupVersionResource{
+		Group:    customRD.Spec.Group,
+		Version:  customRD.Spec.Versions[0].Name,
+		Resource: customRD.Spec.Names.Plural,
+	}
+
+	// Handle deletions
+	if !construct.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("construct is deleted")
+		log.Info("Unregistering GVK in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
+		r.DynamicController.UnregisterGVK(gvr)
+		log.Info("Unregistering workflow operator in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
+		r.DynamicController.UnregisterWorkflowOperator(gvr)
+		log.Info("Removing finalizer from construct", "crd_name", customRD.Name, "gvr", gvr)
+		err = r.setUnmanaged(ctx, &construct)
+		if err != nil {
+			log.Info("unable to set unmanaged")
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	gvrStr := fmt.Sprintf("%s/%s/%s", gvr.Group, gvr.Version, gvr.Resource)
+	log.Info("Registering GVK in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvrStr)
+	r.DynamicController.SafeRegisterGVK(gvr)
+
+	log.Info("Registering workflow operator in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvrStr)
+	err = r.DynamicController.RegisterWorkflowOperator(
+		ctx,
+		gvr,
+		&construct,
 	)
+	if err != nil {
+		log.Info("unable to register workflow operator")
+		return ctrl.Result{}, err
+	}
+
+	// Set managed
+	log.Info("Setting symphony finalizers", "crd_name", customRD.Name, "gvr", gvrStr)
+	err = r.setManaged(ctx, &construct)
+	if err != nil {
+		log.Info("unable to set managed")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -116,4 +155,18 @@ func (r *ConstructReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&xv1alpha1.Construct{}).
 		Complete(r)
+}
+
+func (r *ConstructReconciler) setManaged(ctx context.Context, construct *v1alpha1.Construct) error {
+	newFinalizers := finalizer.AddSymphonyFinalizer(construct)
+	dc := construct.DeepCopy()
+	dc.Finalizers = newFinalizers
+	return r.Update(ctx, dc)
+}
+
+func (r *ConstructReconciler) setUnmanaged(ctx context.Context, construct *v1alpha1.Construct) error {
+	newFinalizers := finalizer.RemoveSymphonyFinalizer(construct)
+	dc := construct.DeepCopy()
+	dc.Finalizers = newFinalizers
+	return r.Update(ctx, dc)
 }

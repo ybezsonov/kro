@@ -33,6 +33,10 @@ func NewAdvisoryCondition(status corev1.ConditionStatus, reason, message *string
 	return NewCondition(v1alpha1.ConditionTypeAdvisory, status, reason, message)
 }
 
+func NewGraphSyncedCondition(status corev1.ConditionStatus, reason, message *string) v1alpha1.Condition {
+	return NewCondition(v1alpha1.ConditionTypeGraphSynced, status, reason, message)
+}
+
 func GetCondition(conditions []v1alpha1.Condition, t v1alpha1.ConditionType) *v1alpha1.Condition {
 	for _, c := range conditions {
 		if c.Type == t {

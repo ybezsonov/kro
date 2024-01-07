@@ -3,9 +3,11 @@ package construct
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
 )
 
@@ -167,6 +169,15 @@ func (r *Resource) AddDependency(runtimeID string) {
 func (r *Resource) Unstructured() *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: r.Data,
+	}
+}
+
+func (r *Resource) GVR() schema.GroupVersionResource {
+	gvk := r.Unstructured().GroupVersionKind()
+	return schema.GroupVersionResource{
+		Group:    gvk.Group,
+		Version:  gvk.Version,
+		Resource: strings.ToLower(gvk.Kind) + "s",
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,9 +36,8 @@ type DynamicController struct {
 	kubeClient *dynamic.DynamicClient
 	// synced informs if the controller is synced with the apiserver
 	synced cache.InformerSynced
-
-	workflowOperators map[string]*workflow.Operator
-
+	// workflowOperators is a map of the registered workflow operators
+	workflowOperators map[schema.GroupVersionResource]*workflow.Operator
 	// handler is the function that will be called when a new work item is added
 	// to the queue. The argument to the handler is an interface that should be
 	// castable to the appropriate type.
@@ -81,7 +82,7 @@ func NewDynamicController(
 		log:               &logger,
 		mu:                sync.RWMutex{},
 		listers:           map[schema.GroupVersionResource]dynamiclister.Lister{},
-		workflowOperators: map[string]*workflow.Operator{},
+		workflowOperators: map[schema.GroupVersionResource]*workflow.Operator{},
 	}
 	return dc
 }
@@ -114,23 +115,30 @@ func (cc *DynamicController) worker(ctx context.Context) {
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
 func (cc *DynamicController) processNextWorkItem(ctx context.Context) bool {
-	cKey, quit := cc.queue.Get()
+	item, quit := cc.queue.Get()
 	if quit {
 		return false
 	}
-	defer cc.queue.Done(cKey)
+	defer cc.queue.Done(item)
 
-	if err := cc.syncFunc(ctx, cKey.(string)); err != nil {
-		cc.queue.AddRateLimited(cKey)
+	itemUnwrapper := item.(ObjectIdentifiers)
+	if err := cc.syncFunc(ctx, itemUnwrapper); err != nil {
+		cc.queue.AddRateLimited(item)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("sync %v failed with : %v", cKey, err))
+			gvrKey := fmt.Sprintf("%s/%s/%s/%s", itemUnwrapper.GVR.Group, itemUnwrapper.GVR.Version, itemUnwrapper.GVR.Resource, itemUnwrapper.Key)
+			utilruntime.HandleError(fmt.Errorf("sync %v failed with : %v", gvrKey, err))
 		}
 		return true
 	}
 
-	cc.queue.Forget(cKey)
+	cc.queue.Forget(item)
 	return true
 
+}
+
+type ObjectIdentifiers struct {
+	Key string
+	GVR schema.GroupVersionResource
 }
 
 func (cc *DynamicController) enqueueObject(obj interface{}) {
@@ -139,18 +147,62 @@ func (cc *DynamicController) enqueueObject(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-	cc.queue.Add(key)
+	// obj is a claim of a defined construct, we do not have an idea of the construct name
+	// so we enqueue two things:
+	//   - the claim key (namespacedName)
+	//   - the GVR of the claim (this will be usefull to know which handler to call)
+	//
+	// The reason we have so many handlers is because those handlers are compiled graphs
+	// with a set of workflow steps that are specific to the construct.
+
+	// Since we are using a dynamic informer/client, it is guaranteed that the object is
+	// a pointer to unstructured.Unstructured.
+	u, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("object is not of type unstructured.Unstructured"))
+		return
+	}
+
+	// extract group and version from apiVersion
+	apiVersion := u.GetAPIVersion()
+	parts := strings.Split(apiVersion, "/")
+	if len(parts) != 2 {
+		utilruntime.HandleError(fmt.Errorf("invalid apiVersion: %s", apiVersion))
+		return
+	}
+	group := parts[0]
+	version := parts[1]
+
+	objectIdentifiers := ObjectIdentifiers{
+		Key: key,
+		GVR: schema.GroupVersionResource{
+			Group:    group,
+			Version:  version,
+			Resource: strings.ToLower(u.GetKind()) + "s",
+		},
+	}
+
+	cc.queue.Add(objectIdentifiers)
 }
 
-func (cc *DynamicController) syncFunc(ctx context.Context, key string) error {
+func (cc *DynamicController) syncFunc(ctx context.Context, oi ObjectIdentifiers) error {
 	logger := klog.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
 		logger.Info("Finished syncing construct claim request", "elapsedTime", time.Since(startTime))
 	}()
 
-	wo := cc.workflowOperators[""]
-	return wo.Handler(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: key}})
+	fmt.Println("====================================")
+	for gvk := range cc.workflowOperators {
+		fmt.Println("    => DC workflow operator exist", gvk)
+		fmt.Println("    => You are looking for oi.GVR", oi.GVR)
+	}
+
+	wo, ok := cc.workflowOperators[oi.GVR]
+	if !ok {
+		return fmt.Errorf("no workflow operator found for GVR: %s", oi.GVR)
+	}
+	return wo.Handler(ctx, ctrl.Request{NamespacedName: types.NamespacedName{Name: oi.Key}})
 }
 
 func (dc *DynamicController) Shutdown() {
@@ -165,11 +217,11 @@ func (dc *DynamicController) Shutdown() {
 
 // RegisterGVK registers a new GVK to the informers map aggressively.
 func (dc *DynamicController) RegisterGVK(gvr schema.GroupVersionResource) {
-	gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, metav1.NamespaceAll, nil)
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
+	gvkInformer := dynamicinformer.NewFilteredDynamicSharedInformerFactory(dc.kubeClient, 0, metav1.NamespaceAll, nil)
 	dc.informers[gvr] = gvkInformer
-	dc.log.V(4).Info("Finished registering GVK", "gvk", gvr)
+	dc.log.Info("Finished registering GVK", "gvk", gvr)
 }
 
 // SafeRegisterGVK registers a new GVK to the informers map safely.
@@ -210,13 +262,15 @@ func (dc *DynamicController) SafeRegisterGVK(gvr schema.GroupVersionResource) {
 		dc.cancelFuncs[gvr] = cancel
 
 		time.Sleep(1 * time.Second)
-		fmt.Println("Starting informer")
+		dc.log.Info("Starting informer", "gvr", gvr)
 		go gvkInformer.Start(ctx.Done())
 	}
-	dc.log.V(4).Info("Finished safe-registering GVR", "gvr", gvr)
+	fmt.Println("    => DC informers count", len(dc.informers))
+	dc.log.Info("Finished safe registering GVR", "gvr", gvr)
 }
 
 func (dc *DynamicController) UnregisterGVK(gvr schema.GroupVersionResource) {
+	dc.log.Info("Unregistering GVK", "gvr", gvr)
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	delete(dc.informers, gvr)
@@ -227,7 +281,11 @@ func (cc *DynamicController) HotRestart() bool {
 	return true
 }
 
-func (cc *DynamicController) RegisterWorkflowOperator(gvr schema.GroupVersionResource, c *v1alpha1.Construct) error {
+func (dc *DynamicController) RegisterWorkflowOperator(ctx context.Context, gvr schema.GroupVersionResource, c *v1alpha1.Construct) error {
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+
+	dc.log.Info("Creating construct graph", c.Name)
 	resources := make([]v1alpha1.Resource, 0)
 	for _, resource := range c.Spec.Resources {
 		resources = append(resources, *resource)
@@ -238,7 +296,16 @@ func (cc *DynamicController) RegisterWorkflowOperator(gvr schema.GroupVersionRes
 		return err
 	}
 
-	wo := workflow.NewOperator(gvr, graph, cc.kubeClient.Resource(gvr))
-	cc.workflowOperators["gvr"] = wo
+	dc.log.Info("Creating workflow operator", "gvr", gvr)
+	wo := workflow.NewOperator(ctx, gvr, graph, dc.kubeClient)
+	dc.workflowOperators[gvr] = wo
+	fmt.Println("    => Operators count", len(dc.workflowOperators))
 	return nil
+}
+
+func (dc *DynamicController) UnregisterWorkflowOperator(gvr schema.GroupVersionResource) {
+	dc.log.Info("Unregistering workflow operator", "gvr", gvr)
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+	delete(dc.workflowOperators, gvr)
 }
