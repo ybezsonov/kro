@@ -1,0 +1,156 @@
+# Adapted from https://amazon-eks.s3.us-west-2.amazonaws.com/cloudformation/2020-10-29/amazon-eks-vpc-private-subnets.yaml
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: VPC
+metadata:
+  name: gitops-cluster-vpc
+spec:
+  cidrBlock: 192.168.0.0/16
+  tagSpecifications:
+  - resourceType: vpc
+    tags:
+    - key: Name
+      value: gitops-cluster
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: gitops-cluster-public-subnet1
+spec:
+  availabilityZone: us-west-2a
+  cidrBlock: 192.168.0.0/18
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: gitops-cluster-public-subnet2
+spec:
+  availabilityZone: us-west-2b
+  cidrBlock: 192.168.64.0/18
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: gitops-cluster-private-subnet1
+spec:
+  availabilityZone: us-west-2a
+  cidrBlock: 192.168.128.0/18
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: Subnet
+metadata:
+  name: gitops-cluster-private-subnet2
+spec:
+  availabilityZone: us-west-2b
+  cidrBlock: 192.168.192.0/18
+  # vpcRef:
+  #   from:
+  #     name: gitops-cluster-vpc
+  # routeTableRefs:
+  # - from:
+  #     name: gitops-cluster-private-route-table-az2
+  tagSpecifications:
+  - resourceType: "subnet"
+    tags:
+    - key: Name
+      value: GitOps Cluster Private Subnet 2
+    - key: kubernetes.io/role/internal-elb
+      value: 1
+---
+apiVersion: ec2.services.k8s.aws/v1alpha1
+kind: SecurityGroup
+metadata:
+  name: gitops-cluster-cp-security-group
+spec:
+  vpcRef: gitops-cluster-vpc
+---
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: gitops-cluster-cluster-role
+spec:
+  name: gitops-cluster-cluster-role
+  policies:
+  - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "eks.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+---
+apiVersion: iam.services.k8s.aws/v1alpha1
+kind: Role
+metadata:
+  name: gitops-cluster-node-role
+spec:
+  name: gitops-cluster-node-role
+  policies:
+  - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+  - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+  - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+  assumeRolePolicyDocument: |
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Service": "ec2.amazonaws.com"
+          },
+          "Action": "sts:AssumeRole"
+        }
+      ]
+    }
+---
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: Cluster
+metadata:
+  name: gitops-cluster
+spec:
+  name: my-referenced-test-cluster
+  roleRef:
+    from:
+      name: gitops-cluster-cluster-role
+  resourcesVPCConfig:
+    endpointPrivateAccess: true
+    endpointPublicAccess: true
+    subnetRefs:
+    - from:
+        name: gitops-cluster-public-subnet1
+    - from:
+        name: gitops-cluster-public-subnet2
+    - from:
+        name: gitops-cluster-private-subnet1
+    - from:
+        name: gitops-cluster-private-subnet2
+---
+apiVersion: eks.services.k8s.aws/v1alpha1
+kind: Nodegroup
+metadata:
+  name: gitops-cluster-nodegroup
+spec:
+  name: my-test-nodegroup
+  clusterNameRef:
+    from:
+      name: my-test-cluster-with-nodegroups
+  subnetRefs:
+  - from:
+      name: gitops-cluster-private-subnet1
+  - from:
+      name: gitops-cluster-private-subnet2
+  nodeRoleRef:
+    from:
+      name: gitops-cluster-node-role
+  updateConfig:
+    maxUnavailable: 1
+  scalingConfig:
+    minSize: 1
+    maxSize: 1
+    desiredSize: 1

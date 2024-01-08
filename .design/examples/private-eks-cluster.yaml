@@ -1,0 +1,133 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: Construct
+metadata:
+  name: privateekscluster.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: PrivateEKSCluster
+  definition:
+    spec:
+      name: string
+      version: string
+      numNodes: string
+    status:
+      clusterARN: string
+
+  # Building a cluster with a VPC, subnets, security group, and role
+  resources:
+  - name: securityGroup
+    definition:
+      apiVersion: ec2.services.k8s.aws/v1alpha1
+      kind: SecurityGroup
+      metadata:
+        name: cluster-security-group-${spec.name}
+      spec:
+        vpcID: ${clusterVPC.status.id}
+  - name: clusterVPC
+    definition:
+      apiVersion: ec2.services.k8s.aws/v1alpha1
+      kind: VPC
+      metadata:
+        name: cluster-vpc-${spec.name}
+      spec:
+        cidrBlock: 192.168.0.0/16
+  - name: subnetAZA
+    definition:
+      apiVersion: ec2.services.k8s.aws/v1alpha1
+      kind: Subnet
+      metadata:
+        name: cluster-subnet-a-${spec.name}
+      spec:
+        availabilityZone: us-west-2a
+        cidrBlock: 192.168.0.0/18
+        vpcID: ${clusterVPC.status.id}
+#  - name: subnetAZB
+#    definition:
+#      apiVersion: ec2.services.k8s.aws/v1alpha1
+#      kind: Subnet
+#      metadata:
+#        name: cluster-subnet-b-${spec.name}
+#      spec:
+#        availabilityZone: us-west-2b
+#        cidrBlock: 192.168.64.0/18
+#        vpcID: ${clusterVPC.status.id}
+  - name: clusterRole
+    definition:
+      apiVersion: iam.services.k8s.aws/v1alpha1
+      kind: Role
+      metadata:
+        name: cluster-role
+      spec:
+        name: cluster-role
+        policies:
+        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
+        assumeRolePolicyDocument: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "eks.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+  - name: nodeRole
+    definition:
+      apiVersion: iam.services.k8s.aws/v1alpha1
+      kind: Role
+      metadata:
+        name: cluster-node-role
+      spec:
+        name: cluster-node-role
+        policies:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        assumeRolePolicyDocument: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+  - name: cluster
+    definition:
+      apiVersion: eks.services.k8s.aws/v1alpha1
+      kind: Cluster
+      metadata:
+        name: ack-cluster
+      spec:
+        name: ack-cluster
+        roleARN: ${clusterRole.status.ackResourceMetadata.arn}
+        resourcesVPCConfig:
+          endpointPrivateAccess: true
+          endpointPublicAccess: true
+          subnetIDs:
+            - ${subnetAZA.status.id}
+  - name: nodegroup
+    definition:
+      apiVersion: eks.services.k8s.aws/v1alpha1
+      kind: Nodegroup
+      metadata:
+        name: cluster-nodegroup
+      spec:
+        name: test-nodegroup
+        clusterName: ${cluster.spec.name}
+        subnets:
+          - ${subnetAZA.status.id}
+        nodeRole: ${nodeRole.status.ackResourceMetadata.arn}
+        updateConfig:
+          maxUnavailable: 1
+        scalingConfig:
+          minSize: ${spec.numNodes}
+          maxSize: ${spec.numNodes}
+          desiredSize: ${spec.numNodes}
