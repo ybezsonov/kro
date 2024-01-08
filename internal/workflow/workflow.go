@@ -2,19 +2,24 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/aws/symphony/internal/construct"
-	"github.com/aws/symphony/internal/requeue"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/aws/symphony/api/v1alpha1"
+	"github.com/aws/symphony/internal/construct"
+	"github.com/aws/symphony/internal/requeue"
 )
 
 // This package transforms the Resource Graph into a Workflow matrix.
@@ -60,12 +65,8 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 	parts := strings.Split(req.Name, "/")
 	name := parts[len(parts)-1]
 	namespace := parts[0]
-	fmt.Println("  => using name: ", name)
-	fmt.Println("  => using namespace: ", namespace)
-
 	// init client for gvk
 	client := o.client.Resource(o.target)
-	fmt.Println("  => using gvr: ", o.target)
 
 	// extract claim from request
 	claimUnstructured, err := client.Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -73,33 +74,36 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
-	o.log.Info("Setting claim in graph", "name", req.NamespacedName)
 	o.mainGraph.Claim = construct.Claim{Unstructured: claimUnstructured}
 
 	/* err = o.mainGraph.TopologicalSort()
 	if err != nil {
 		return err
 	} */
-	fmt.Println("+ resolving variables")
 	err = o.mainGraph.ResolvedVariables()
 	if err != nil {
 		return err
 	}
-	fmt.Println("+ replacing variables")
 	err = o.mainGraph.ReplaceVariables()
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("_____________")
+	if o.mainGraph.Claim.IsStatus("") {
+		err = o.patchClaimStatus(ctx, "IN PROGRESS", []v1alpha1.Condition{})
+		if err != nil {
+			return err
+		}
+	}
+
 	o.stateTracker.String()
 
-	fmt.Println("     +> starting graph execution")
+	fmt.Println("     > starting graph execution")
 	for i := range o.mainGraph.Resources {
 		resource := o.mainGraph.Resources[i]
-		fmt.Println("         +> resource: ", resource.RuntimeID)
-		fmt.Println("             +> current state: ", o.stateTracker.GetState(resource.RuntimeID))
-		fmt.Println("             +> dependencies ready: ", o.stateTracker.ResourceDependenciesReady(resource.RuntimeID))
+		fmt.Println("         > resource: ", resource.RuntimeID)
+		fmt.Println("             > current state: ", o.stateTracker.GetState(resource.RuntimeID))
+		fmt.Println("             > dependencies ready: ", o.stateTracker.ResourceDependenciesReady(resource.RuntimeID))
 		if !o.stateTracker.ResourceDependenciesReady(resource.RuntimeID) {
 			return requeue.NeededAfter(fmt.Errorf("resource dependencies not ready"), 5)
 		}
@@ -139,29 +143,23 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 			}
 		}
 		fmt.Println("             => resource found..")
-		if observed != nil {
+		if resource.IsStatusless() {
+			o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
+		} else if observed != nil {
 			observedStatus, ok := observed.Object["status"]
 			fmt.Println("             => resource has status", ok)
 			if ok {
-				// fmt.Println("             => setting status", observedStatus)
-				fmt.Println("** setting status for", resource.RuntimeID, observed.Object["status"])
 				err := resource.SetStatus(observedStatus.(map[string]interface{}))
 				if err != nil {
 					return err
 				}
-				fmt.Println("status set successfully?", resource.HasStatus())
-				fmt.Println("             => resource status set TO READY")
 				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
-				// list resources that
 
-				// ...
-				fmt.Println("::: pre")
 				// o.mainGraph.PrintVariables()
 				err = o.mainGraph.ResolvedVariables()
 				if err != nil {
 					return err
 				}
-				fmt.Println("::: post")
 				o.mainGraph.PrintVariables()
 				err = o.mainGraph.ReplaceVariables()
 				if err != nil {
@@ -169,6 +167,8 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				}
 				// fmt.Println("			 => raw data: ", resource.Data)
 			}
+
+			// fmt.Println("             => resource status set TO READY")
 		}
 	}
 	if !o.stateTracker.AllReady() {
@@ -178,14 +178,47 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 	fmt.Println("     => all resources are ready. done")
 
 	o.stateTracker.String()
+
+	msg := "All resources are ready"
+	err = o.patchClaimStatus(ctx, "SUCCESS", []v1alpha1.Condition{
+		{
+			Type:               v1alpha1.ConditionTypeResourceSynced,
+			Status:             corev1.ConditionTrue,
+			LastTransitionTime: &metav1.Time{Time: time.Now()},
+			Reason:             &msg,
+			Message:            &msg,
+		},
+	})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (o *Operator) patchClaimStatus(ctx context.Context, status map[string]interface{}) error {
+func (o *Operator) patchClaimStatus(ctx context.Context, state string, conditions []v1alpha1.Condition) error {
+	fmt.Println("patching claim status", o.target)
 	claim := o.mainGraph.Claim
-	claim.Object["status"] = status
+
+	s := map[string]interface{}{
+		"state":      state,
+		"conditions": conditions,
+	}
+	claim.Object["status"] = s
+	claim.Unstructured.Object["status"] = s
 	claimUnstructured := claim.Unstructured
 	client := o.client.Resource(o.target)
-	_, err := client.Namespace(claimUnstructured.GetNamespace()).UpdateStatus(ctx, claimUnstructured, metav1.UpdateOptions{})
-	return err
+	fmt.Println(claim.Object)
+	fmt.Println("GOING FOR IT", claimUnstructured.GetName())
+	/* _, err := client.Namespace("default").Get(ctx, claimUnstructured.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return err
+	} */
+	fmt.Println("GOT IT")
+
+	b, _ := json.Marshal(claim.Unstructured)
+	_, err := client.Namespace("default").Patch(ctx, claimUnstructured.GetName(), types.MergePatchType, b, metav1.PatchOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -12,6 +12,9 @@ spec:
       policyDocument: string
       serviceAccountName: string
       namespace: string
+    status:
+      serviceAccountName: string
+      roleName: string
   resources:
   - name: irsaPolicy
     definition:

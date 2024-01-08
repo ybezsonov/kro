@@ -66,6 +66,19 @@ func (r *Resource) HasStatus() bool {
 	return ok
 }
 
+// Some resources like ServiceAccount, ConfigMap, etc. don't have status
+// We need to hard code this for now.
+func (r *Resource) IsStatusless() bool {
+	kind := r.Unstructured().GetKind()
+	return kind == "ServiceAccount" ||
+		kind == "ConfigMap" ||
+		kind == "Secret" ||
+		kind == "Role" ||
+		kind == "RoleBinding" ||
+		kind == "ClusterRole" ||
+		kind == "ClusterRoleBinding"
+}
+
 func haveRef(refs []*ResourceRef, runtimeID string) bool {
 	for _, ref := range refs {
 		if ref.RuntimeID == runtimeID {

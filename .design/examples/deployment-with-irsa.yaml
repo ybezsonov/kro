@@ -29,6 +29,8 @@ spec:
       kind: Deployment
       metadata:
         name: deployment-with-irsa
+        annotations:
+          awaiting: ${symphonyIRSA.status.state}
       spec:
         replicas: ${spec.replicas}
         selector:

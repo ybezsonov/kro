@@ -14,3 +14,11 @@ type _ struct {
 type Claim struct {
 	*unstructured.Unstructured
 }
+
+func (c *Claim) IsStatus(state string) bool {
+	status, ok, err := unstructured.NestedString(c.Object, "status", "state")
+	if err != nil || !ok {
+		return "" == state
+	}
+	return status == state
+}

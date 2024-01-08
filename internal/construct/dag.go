@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aws/symphony/api/v1alpha1"
 	"github.com/google/cel-go/common/types"
 	"sigs.k8s.io/yaml"
+
+	"github.com/aws/symphony/api/v1alpha1"
 )
+
+// Here be dragons! This is the most complex part of the code. It's responsible for
+// parsing the resources and building a graph of relationships between them.
+// The graph is then used to determine the order in which the resources should be
+// created/managed.
 
 type Graph struct {
 	Claim     Claim
@@ -300,10 +306,7 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 
 func (r *Resource) ApplyResolvedVariables() error {
 	vars := make(map[string]string)
-	fmt.Println("Detected variables for resource: ", r.RuntimeID)
-	fmt.Println("+++ variables:")
 	for _, variable := range r.Variables {
-		fmt.Println("::", variable.Expression, " => ", variable.ResolvedValue)
 		if variable.Type == VariableTypeStaticReference {
 			if variable.ResolvedValue != nil {
 				switch v := variable.ResolvedValue.(type) {
@@ -311,6 +314,20 @@ func (r *Resource) ApplyResolvedVariables() error {
 					vars[variable.Expression] = v
 				case types.String:
 					vars[variable.Expression] = v.Value().(string)
+				case int, int64, int32, int16, int8:
+					vars[variable.Expression] = fmt.Sprintf("%d", v)
+				case types.Int:
+					vars[variable.Expression] = fmt.Sprintf("%d", v.Value().(int))
+				case float64, float32:
+					vars[variable.Expression] = fmt.Sprintf("%f", v)
+				case types.Double:
+					vars[variable.Expression] = fmt.Sprintf("%f", v.Value().(float64))
+				case bool:
+					vars[variable.Expression] = fmt.Sprintf("%t", v)
+				case types.Bool:
+					vars[variable.Expression] = fmt.Sprintf("%t", v.Value().(bool))
+				case types.Null:
+					vars[variable.Expression] = ""
 				default:
 					return fmt.Errorf("unknown variable type: %v: type=%v", variable.ResolvedValue, v)
 				}
@@ -328,11 +345,7 @@ func (r *Resource) ApplyResolvedVariables() error {
 		}
 	}
 
-	fmt.Println("+++ variables:", vars)
-
-	fmt.Println("\n++++++++ old raw", string(r.Raw))
 	r.Raw = r.replaceVariables(vars)
-	fmt.Println("++++++++ new raw\n", string(r.Raw))
 	var newData map[string]interface{}
 	err := yaml.Unmarshal(r.Raw, &newData)
 	if err != nil {
@@ -361,14 +374,7 @@ func (g *Graph) ResolvedVariables() error {
 	return nil
 }
 
-func (g *Graph) PrintVariables() {
-	for _, resource := range g.Resources {
-		fmt.Println("Resource: ", resource.RuntimeID)
-		for _, variable := range resource.Variables {
-			fmt.Println("::", variable.Expression, " => ", variable.ResolvedValue)
-		}
-	}
-}
+func (g *Graph) PrintVariables() {}
 
 func (g *Graph) ReplaceVariables() error {
 	for _, resource := range g.Resources {
