@@ -1,0 +1,47 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: Construct
+metadata:
+  name: deploymentwithirsa.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: DeploymentWithIRSA
+  definition:
+    spec:
+      policyDocument: string
+      image: string
+      replicas: int
+  resources:
+  - name: symphonyIRSA
+    definition:
+      apiVersion: x.symphony.k8s.aws/v1alpha1
+      kind: IRSA
+      metadata:
+        name: deployment-with-irsa
+      spec:
+        awsAccountID: "095708837592"
+        eksOIDC: "oidc.eks.us-east-1.amazonaws.com/id/12345678901234567890"
+        policyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListAllMyBuckets","Resource":"arn:aws:s3:::*"},{"Effect":"Allow","Action":["s3:List*"],"Resource":["*"]}]}'
+        serviceAccountName: "symphony-managed-service-account"
+        namespace: default
+  - name: deployment
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: deployment-with-irsa
+      spec:
+        replicas: ${spec.replicas}
+        selector:
+          matchLabels:
+            app: my-app
+        template:
+          metadata:
+            labels:
+              app: my-app
+          spec:
+            serviceAccountName: ${symphonyIRSA.spec.serviceAccountName}
+            containers:
+            - name: container1
+              image: ${spec.image}
+              ports:
+              - containerPort: 80

@@ -1,0 +1,10 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: IRSA
+metadata:
+  name: irsa-claim
+spec:
+  awsAccountID: "095708837592"
+  eksOIDC: "oidc.eks.us-east-1.amazonaws.com/id/12345678901234567890"
+  policyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListAllMyBuckets","Resource":"arn:aws:s3:::*"},{"Effect":"Allow","Action":["s3:List*"],"Resource":["*"]}]}'
+  serviceAccountName: "symphony-managed-service-account"
+  namespace: default

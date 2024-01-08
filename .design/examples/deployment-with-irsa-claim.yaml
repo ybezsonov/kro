@@ -1,0 +1,62 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: Construct
+metadata:
+  name: irsa.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: IRSA
+  definition:
+    spec:
+      awsAccountID: string
+      eksOIDC: string
+      policyDocument: string
+      serviceAccountName: string
+      namespace: string
+  resources:
+  - name: irsaPolicy
+    definition:
+      apiVersion: iam.services.k8s.aws/v1alpha1
+      kind: Policy
+      metadata:
+        name: irsa-policy-name
+      spec:
+        name: symphony-irsa-policy
+        description: "My symphony policy"
+        policyDocument: ${spec.policyDocument}
+  - name: irsaRole
+    definition:
+      apiVersion: iam.services.k8s.aws/v1alpha1
+      kind: Role
+      metadata:
+        name: irsa-policy
+      spec:
+        name: irsa-policy
+        description: "My symphony role"
+        policies:
+        - ${irsaPolicy.status.ackResourceMetadata.arn}
+        assumeRolePolicyDocument: |
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "arn:aws:iam::${spec.awsAccountID}:oidc-provider/${spec.eksOIDC}"
+                },
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "StringLike": {
+                    "${spec.eksOIDC}:sub": "system:serviceaccount:${spec.namespace}:${spec.serviceAccountName}"
+                  }
+                }
+              }
+            ]
+          }
+  - name: irsaServiceAccount
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: ${spec.serviceAccountName}
+        annotations:
+          eks.amazonaws.com/role-arn: ${irsaRole.status.ackResourceMetadata.arn}

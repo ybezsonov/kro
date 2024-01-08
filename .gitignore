@@ -24,4 +24,5 @@ Dockerfile.cross
 *.swp
 *.swo
 *~
-.design
+.design/*md
+.design/assets

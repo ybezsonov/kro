@@ -16,23 +16,63 @@ func NewTransformer() *OpenAPISchemaTransformer {
 }
 
 // Transform takes a raw object and returns a JSONSchemaProps
-func (t *OpenAPISchemaTransformer) Transform(rawObject []byte) (*extv1.JSONSchemaProps, error) {
-	objectMap := make(map[string]interface{})
-	if err := yaml.Unmarshal(rawObject, &objectMap); err != nil {
+func (t *OpenAPISchemaTransformer) Transform(specRawObject []byte, statusRawObject []byte) (*extv1.JSONSchemaProps, error) {
+	statusObjectMap := make(map[string]interface{})
+	if err := yaml.Unmarshal(specRawObject, &statusObjectMap); err != nil {
 		return nil, err
 	}
 	openAPIv3Schema := newBaseResource()
 	specSchema := openAPIv3Schema.Properties["spec"]
 	// now we recursively walk the objectMap and build the spec schema
-	if err := t.buildSchema(objectMap, &specSchema); err != nil {
+	if err := t.buildSchema(statusObjectMap, &specSchema); err != nil {
 		return nil, err
 	}
 	// now we can build the status schema
-	/* statusSchema := openAPIv3Schema.Properties["status"]
-	if err := t.buildStatusSchema(rawObject, &statusSchema); err != nil {
+	statusSchema := openAPIv3Schema.Properties["status"]
+	if err := t.buildStatusSchema(statusRawObject, &statusSchema); err != nil {
 		return nil, err
-	} */
+	}
 	return openAPIv3Schema, nil
+}
+
+func (t *OpenAPISchemaTransformer) buildStatusSchema(statusRawObject []byte, schema *extv1.JSONSchemaProps) error {
+	statusObjectMap := make(map[string]interface{})
+	if err := yaml.Unmarshal(statusRawObject, &statusObjectMap); err != nil {
+		return err
+	}
+	if err := t.buildSchema(statusObjectMap, schema); err != nil {
+		return err
+	}
+	// we need to inject State and Conditions
+	schema.Properties["state"] = extv1.JSONSchemaProps{
+		Type: "string",
+	}
+	schema.Properties["conditions"] = extv1.JSONSchemaProps{
+		Type: "array",
+		Items: &extv1.JSONSchemaPropsOrArray{
+			Schema: &extv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]extv1.JSONSchemaProps{
+					"type": {
+						Type: "string",
+					},
+					"status": {
+						Type: "string",
+					},
+					"reason": {
+						Type: "string",
+					},
+					"message": {
+						Type: "string",
+					},
+					"lastTransitionTime": {
+						Type: "string",
+					},
+				},
+			},
+		},
+	}
+	return nil
 }
 
 func (t *OpenAPISchemaTransformer) buildSchema(objectMap map[string]interface{}, schema *extv1.JSONSchemaProps) error {

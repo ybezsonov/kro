@@ -72,7 +72,7 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	log.Info("Transforming construct definition to OpenAPIv3 schema", "name", req.NamespacedName)
 
 	// Handle creation
-	oaSchema, err := r.OpenAPISchema.Transform(construct.Spec.Definition.Spec.Raw)
+	oaSchema, err := r.OpenAPISchema.Transform(construct.Spec.Definition.Spec.Raw, construct.Spec.Definition.Status.Raw)
 	if err != nil {
 		log.Info("unable to transform OpenAPI schema")
 		return ctrl.Result{}, err

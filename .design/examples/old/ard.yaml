@@ -1,0 +1,44 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: Construct
+metadata:
+  name: irsas.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: IRSA
+  definition:
+    spec:
+      awsAccountID: string
+      eksOIDC: string
+      permissionsBoundaryArn: string
+      policyArns: '[]string'
+      serviceAccountName: string
+      resourceConfig:
+        deletionPolicy: string
+        region: string
+        tags: map[string]string
+    status:
+      roleArn: string
+      roleName: string
+    required:
+      - awsAccountID
+      - eksOIDC
+      - serviceAccountName
+      - resourceConfig
+  resources:
+    - name: irsa-policy
+      definition:
+        apiVersion: iam.services.k8s.aws/v1alpha1
+        kind: Role
+        metadata:
+          name: irsa-policy
+        spec:
+          name: irsa-policy
+          policies: ${spec.policyARNs}
+    - name: service-account
+      definition:
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: $spec.serviceAccountName
+          annotations:
+            eks.amazonaws.com/role-arn: ${irsa-policy.status.ACKResourceMetadata.ARN}

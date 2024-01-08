@@ -1,0 +1,501 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EKS cluster'
+Parameters:
+  ClusterName:
+    Type: String
+    Description: EKS cluster name
+  ClusterRole:
+    Type: String
+    Description: EKS cluster role Arn
+  NodeRole:
+    Type: String
+    Description: EKS cluster node role Arn
+  ClusterVersion:
+    Type: String
+    Default: "1.28"
+    Description: EKS cluster version
+  KMSKey:
+    Type: String
+    Description: KMS Key Arn
+  IPFamily:
+    Type: String
+    Default: ipv4
+    Description: Cluster IP Family
+  ClusterSubnets:
+    Type: List<String>
+    Description: Cluster subnets
+##  Region:
+##    Type: String
+##    Default: us-west-2
+##    Description: Region code. Default is us-west-2.
+Resources:
+  ### cluster ###
+  EKSCluster:
+    Type: AWS::EKS::Cluster
+    Properties:
+      Name: !Ref ClusterName # "mgmt"
+      Version: !Ref ClusterVersion
+      RoleArn: !Ref ClusterRole # "arn:aws:iam::406946685607:role/AmazonEKSClusterRole"
+      ResourcesVpcConfig:
+        SubnetIds: !Ref ClusterSubnets
+        #- "subnet-0d87626056d3dde46"
+        #- "subnet-06e405d31d077192f"
+        EndpointPublicAccess: true
+        EndpointPrivateAccess: true
+      KubernetesNetworkConfig:
+        IpFamily: !Ref IPFamily
+      AccessConfig:
+        AuthenticationMode: "API"
+        BootstrapClusterCreatorAdminPermissions: true
+      EncryptionConfig:
+        - Provider:
+            KeyArn: !Ref KMSKey # "arn:aws:kms:us-west-2:406946685607:key/728dee94-2e4f-4bf1-930a-553cf95963c8"
+          Resources:
+            - "secrets"
+      Logging:
+        ClusterLogging:
+          EnabledTypes:
+            - Type: api
+            - Type: audit
+            - Type: authenticator
+            - Type: controllerManager
+            - Type: scheduler
+      Tags:
+        - Key: "test"
+          Value: "value"
+    #DependsOn: [ EKSIAMRole, PublicSubnet01, PublicSubnet02, PrivateSubnet01, PrivateSubnet02, ControlPlaneSecurityGroup ]
+
+  ### access entries ###
+  EKSNodeRoleAccessEntry:
+    Type: AWS::EKS::AccessEntry
+    Properties:
+      ClusterName: !Ref ClusterName # !GetAtt EKSCluster.Arn
+      PrincipalArn: !Ref NodeRole
+      Type: "EC2_LINUX"
+    DependsOn: [ EKSCluster ]
+
+  ### node groups ###
+  CoreAddonsNodeGroup:
+    Type: AWS::EKS::Nodegroup
+    Properties:
+      AmiType: BOTTLEROCKET_x86_64
+      ReleaseVersion: "1.17.0-53f322c2"
+      CapacityType: ON_DEMAND
+      ClusterName: !Ref ClusterName
+      DiskSize: 50
+      ForceUpdateEnabled: true
+      InstanceTypes:
+        - t3.medium
+        - t3a.medium
+      #      Labels:
+      #        Key: Value
+      NodegroupName: core-addons
+      NodeRole: !Ref NodeRole
+      Subnets: !Ref ClusterSubnets
+      ScalingConfig:
+        DesiredSize: 2
+        MaxSize: 3
+        MinSize: 1
+      Taints:
+        - Key: core-addons
+          Effect: NO_SCHEDULE
+    DependsOn: [ EKSNodeRoleAccessEntry ]
+
+  ### pod identity associations ###
+  # flux-system
+  SourceControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/SourceControllerIRSARole
+      Namespace: flux-system
+      ServiceAccount: source-controller
+    DependsOn: [ EKSCluster ]
+  KustomizeControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/KustomizeControllerIRSARole
+      Namespace: flux-system
+      ServiceAccount: kustomize-controller
+    DependsOn: [ EKSCluster ]
+  ImageReflectorControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ImageReflectorControllerIRSARole
+      Namespace: flux-system
+      ServiceAccount: image-reflector-controller
+    DependsOn: [ EKSCluster ]
+
+  # kube-system
+  VPCCNIIPv4PIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/VPCCNIIPv4IRSARole
+      Namespace: kube-system
+      ServiceAccount: aws-node
+    DependsOn: [ EKSCluster ]
+  VPCCNIMetricsHelperPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/VPCCNIMetricsHelperIRSARole
+      Namespace: kube-system
+      ServiceAccount: cni-metrics-helper
+    DependsOn: [ EKSCluster ]
+  KarpenterPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/KarpenterIRSARole
+      Namespace: kube-system
+      ServiceAccount: karpenter
+    DependsOn: [ EKSCluster ]
+#  AWSLoadBalancerControllerPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/AWSLoadBalancerControllerIRSARole
+#      Namespace: kube-system
+#      ServiceAccount: aws-load-balancer-controller
+#    DependsOn: [ EKSCluster ]
+  AmazonEBSCSIDriverPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/AmazonEBSCSIDriverIRSARole
+      Namespace: kube-system
+      ServiceAccount: ebs-csi-controller-sa
+    DependsOn: [ EKSCluster ]
+#  AmazonEFSCSIDriverPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/AmazonEFSCSIDriverIRSARole
+#      Namespace: kube-system
+#      ServiceAccount: efs-csi-controller-sa
+#    DependsOn: [ EKSCluster ]
+#  ExternalDNSPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/ExternalDNSIRSARole
+#      Namespace: kube-system
+#      ServiceAccount: external-dns
+#    DependsOn: [ EKSCluster ]
+#  FluentBitPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/FluentBitIRSARole
+#      Namespace: kube-system
+#      ServiceAccount: fluent-bit
+#    DependsOn: [ EKSCluster ]
+
+  # ack-system
+  ACKIAMControllerIRSARolePIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKIAMControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-iam-controller
+    DependsOn: [ EKSCluster ]
+  ACKRDSControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKRDSControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-rds-controller
+    DependsOn: [ EKSCluster ]
+  ACKEC2ControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKEC2ControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-ec2-controller
+    DependsOn: [ EKSCluster ]
+  ACKKMSControllerIRSARolePIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKKMSControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-kms-controller
+    DependsOn: [ EKSCluster ]
+  ACKSNSControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKSNSControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-sns-controller
+    DependsOn: [ EKSCluster ]
+  ACKSQSControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKSQSControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-sqs-controller
+    DependsOn: [ EKSCluster ]
+  ACKEventBridgeControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKEventBridgeControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-eventbridge-controller
+    DependsOn: [ EKSCluster ]
+  ACKS3ControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKS3ControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-s3-controller
+    DependsOn: [ EKSCluster ]
+  ACKECRControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKECRControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-ecr-controller
+    DependsOn: [ EKSCluster ]
+  ACKEKSControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKEKSControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-eks-controller
+    DependsOn: [ EKSCluster ]
+#  ACKElasticacheControllerPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/ACKElasticacheControllerIRSARole
+#      Namespace: ack-system
+#      ServiceAccount: ack-elasticache-controller
+#    DependsOn: [ EKSCluster ]
+#  ACKMemoryDBControllerPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/ACKMemoryDBControllerIRSARole
+#      Namespace: ack-system
+#      ServiceAccount: ack-memorydb-controller
+#    DependsOn: [ EKSCluster ]
+  ACKLambdaControllerPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ACKLambdaControllerIRSARole
+      Namespace: ack-system
+      ServiceAccount: ack-lambda-controller
+    DependsOn: [ EKSCluster ]
+#  ACKPrometheusControllerPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/ACKPrometheusControllerIRSARole
+#      Namespace: ack-system
+#      ServiceAccount: ack-prometheusservice-controller
+#    DependsOn: [ EKSCluster ]
+11:50
+  # aws-privateca-issuer
+#  AWSPCAIRSARolePIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/AWSPCAIRSARole
+#      Namespace: aws-privateca-issuer
+#      ServiceAccount: aws-privateca-issuer
+#    DependsOn: [ EKSCluster ]
+
+  # amazon-cloudwatch
+  CloudWatchAgentPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/CloudWatchAgentIRSARole
+      Namespace: amazon-cloudwatch
+      ServiceAccount: cloudwatch-agent
+    DependsOn: [ EKSCluster ]
+
+
+  # aws-otel-eks
+  ADOTPIA:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref ClusterName
+      RoleArn: arn:aws:iam::406946685607:role/ADOTIRSARole
+      Namespace: aws-otel-eks
+      ServiceAccount: aws-otel-collector
+    DependsOn: [ EKSCluster ]
+
+  # kubecost
+#  KubecostPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/KubecostIRSARole
+#      Namespace: kubecost
+#      ServiceAccount: kubecost-cost-analyzer
+#    DependsOn: [ EKSCluster ]
+#
+#  KubecostPrometheusPIA:
+#    Type: AWS::EKS::PodIdentityAssociation
+#    Properties:
+#      ClusterName: !Ref ClusterName
+#      RoleArn: arn:aws:iam::406946685607:role/KubecostPrometheusIRSARole
+#      Namespace: kubecost
+#      ServiceAccount: kubecost-prometheus-server
+#    DependsOn: [ EKSCluster ]
+
+  ### add-ons ###
+  EKSPodIdentityAgent:
+    Type: AWS::EKS::Addon
+    Properties:
+      AddonName: "eks-pod-identity-agent"
+      AddonVersion: "v1.1.0-eksbuild.1"
+      ClusterName: !Ref ClusterName
+      ConfigurationValues: |-
+        resources:
+          limits:
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        tolerations:
+          - operator: Exists
+      ResolveConflicts: "OVERWRITE"
+    DependsOn: [ EKSCluster ]
+  VPCCNI:
+    Type: AWS::EKS::Addon
+    Properties:
+      AddonName: "vpc-cni"
+      AddonVersion: "v1.16.0-eksbuild.1"
+      ClusterName: !Ref ClusterName
+      ConfigurationValues: |-
+        resources:
+          limits:
+            memory: 64Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        env:
+          AWS_VPC_K8S_CNI_EXTERNALSNAT: 'true'
+          ENABLE_POD_ENI: 'false'
+          ENABLE_PREFIX_DELEGATION: 'true'
+          AWS_VPC_K8S_CNI_LOG_FILE: stdout
+          AWS_VPC_K8S_PLUGIN_LOG_FILE: stderr
+        enableNetworkPolicy: 'true'
+      ResolveConflicts: "OVERWRITE"
+    DependsOn: [ EKSCluster, EKSPodIdentityAgent, VPCCNIIPv4PIA ]
+  CoreDNS:
+    Type: AWS::EKS::Addon
+    Properties:
+      AddonName: "coredns"
+      AddonVersion: "v1.10.1-eksbuild.6"
+      ClusterName: !Ref ClusterName
+      ConfigurationValues: |-
+        resources:
+          limits:
+            memory: 64Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        tolerations:
+          - key: core-addons
+            operator: Exists
+      ResolveConflicts: "OVERWRITE"
+    DependsOn: [ EKSCluster, CoreAddonsNodeGroup ]
+  KubeProxy:
+    Type: AWS::EKS::Addon
+    Properties:
+      AddonName: "kube-proxy"
+      AddonVersion: "v1.28.4-eksbuild.1"
+      ClusterName: !Ref ClusterName
+      ConfigurationValues: |-
+        resources:
+          limits:
+            memory: 32Mi
+          requests:
+            cpu: 10m
+            memory: 32Mi
+      ResolveConflicts: "OVERWRITE"
+    DependsOn: [ EKSCluster ]
+  AWSEBSCSIDriver:
+    Type: AWS::EKS::Addon
+    Properties:
+      AddonName: "aws-ebs-csi-driver"
+      AddonVersion: "v1.26.0-eksbuild.1"
+      ClusterName: !Ref ClusterName
+      ConfigurationValues: |-
+        controller:
+          extraVolumeTags:
+            environment: prod
+        node:
+          tolerateAllTaints: true
+      ResolveConflicts: "OVERWRITE"
+    DependsOn: [ EKSCluster, EKSPodIdentityAgent, AmazonEBSCSIDriverPIA ]
+#  AmazonCloudWatchObservability: # TODO requires cert-manager
+#    Type: AWS::EKS::Addon
+#    Properties:
+#      AddonName: "amazon-cloudwatch-observability"
+#      AddonVersion: "v1.2.0-eksbuild.1"
+#      ClusterName: !Ref ClusterName
+#      ConfigurationValues: |-
+#        containerLogs:
+#          enabled: true
+#        admissionWebhooks:
+#          autoGenerateCert:
+#            enabled: false
+#          certManager:
+#            enabled: true
+#      ResolveConflicts: "OVERWRITE"
+#    DependsOn: [ EKSCluster, EKSPodIdentityAgent, CloudWatchAgentPIA ]
+
+  ### OIDC provider ###
+  EKSClusterOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      ClientIdList:
+        - "sts.amazonaws.com"
+      ThumbprintList:
+        - "9e99a48a9960b14926bb7f3b02e22da2b0ab7280"
+      Url: !GetAtt EKSCluster.OpenIdConnectIssuerUrl
+    DependsOn: [ EKSCluster ]
+
+#Outputs:
+#  SubnetsPrivate:
+#    Value:
+#      Fn::Join:
+#        - ","
+#        - - Ref: SubnetPrivate01
+#          - Ref: SubnetPrivate02
+#    Export:
+#      Name:
+#        Fn::Sub: "${AWS::StackName}::SubnetsPrivate"
+#  SubnetsPublic:
+#    Value:
+#      Fn::Join:
+#        - ","
+#        - - Ref: SubnetPublic01
+#          - Ref: SubnetPublic02
+#    Export:
+#      Name:
+#        Fn::Sub: "${AWS::StackName}::SubnetsPublic"
+#  VPC:
+#    Value:
+#      Ref: VPC
+#    Export:
+#      Name:
+#        Fn::Sub: "${AWS::StackName}::VPC"

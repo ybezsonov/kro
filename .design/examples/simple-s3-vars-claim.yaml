@@ -1,0 +1,6 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: SimpleS3Var
+metadata:
+  name: simple-s3-claim
+spec:
+  name: ack-symphony-s3-bucket-variable-name

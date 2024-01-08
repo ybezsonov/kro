@@ -1,0 +1,19 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: Construct
+metadata:
+  name: simples3.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: SimpleS3
+  definition:
+    spec:
+      name: string
+  resources:
+  - name: secure-bucket
+    definition:
+      apiVersion: s3.services.k8s.aws/v1alpha1
+      kind: Bucket
+      metadata:
+        name: symphony-ack-s3-bucket
+      spec:
+        name: symphony-ack-s3-bucket

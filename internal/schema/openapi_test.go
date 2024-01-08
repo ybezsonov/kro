@@ -23,7 +23,7 @@ func TestOpenAPISchemaTransformer_Transform(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tr := &OpenAPISchemaTransformer{}
-			got, err := tr.Transform(tt.args.rawObject)
+			got, err := tr.Transform(tt.args.rawObject, nil)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("OpenAPISchemaTransformer.Transform() error = %v, wantErr %v", err, tt.wantErr)
 				return
