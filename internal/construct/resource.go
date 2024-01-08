@@ -175,10 +175,17 @@ func (r *Resource) Unstructured() *unstructured.Unstructured {
 
 func (r *Resource) GVR() schema.GroupVersionResource {
 	gvk := r.Unstructured().GroupVersionKind()
+	plural := ""
+	// if kind finishes with "y" then replace with "ies"
+	if strings.HasSuffix(gvk.Kind, "y") {
+		plural = strings.TrimSuffix(gvk.Kind, "y") + "ies"
+	} else {
+		plural = gvk.Kind + "s"
+	}
 	return schema.GroupVersionResource{
 		Group:    gvk.Group,
 		Version:  gvk.Version,
-		Resource: strings.ToLower(gvk.Kind) + "s",
+		Resource: strings.ToLower(plural),
 	}
 }
 

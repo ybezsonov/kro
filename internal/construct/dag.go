@@ -258,15 +258,8 @@ func detectCyclicDependencies(resource *Resource, resources []*Resource, seen ma
 // The variables are resolved by looking at the claim's spec and other resources spec.
 func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resource, error) {
 	resolver := NewResolver(g)
-	for _, resource := range g.Resources {
-		fmt.Println(".... resource main has status: ", resource.RuntimeID, resource.HasStatus())
-	}
 
 	copyResources := copyResources(g.Resources)
-	// list of resources that have a status
-	for _, resource := range copyResources {
-		fmt.Println(".... resource copy has status: ", resource.RuntimeID, resource.HasStatus())
-	}
 
 	for _, resource := range copyResources {
 		for _, variable := range resource.Variables {
@@ -285,16 +278,10 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 						return nil, fmt.Errorf("couldn't resolve resource variable: %v: %v", trimedExpression, err)
 					}
 					variable.ResolvedValue = variableValue
-
 				case VariableKindResourceStatusReference:
-					fmt.Println("++ resolving status variable: ", trimedExpression, "from", resource.RuntimeID)
 					targetResource, err := g.GetResource(variable.SrcRef.RuntimeID)
 					if err != nil {
 						return nil, fmt.Errorf("!!! couldn't resolve resource variable: %v: %v", trimedExpression, err)
-					}
-					fmt.Println("++ target has statuss: ", targetResource.RuntimeID, " => ", targetResource.HasStatus())
-					if !targetResource.HasStatus() {
-						fmt.Println("++ target has no statuss: ", targetResource.RuntimeID, " => ", targetResource.Data)
 					}
 					if targetResource.HasStatus() {
 						variableValue, err := resolver.ResolverFromResource(trimedExpression, resource)
@@ -313,7 +300,10 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 
 func (r *Resource) ApplyResolvedVariables() error {
 	vars := make(map[string]string)
+	fmt.Println("Detected variables for resource: ", r.RuntimeID)
+	fmt.Println("+++ variables:")
 	for _, variable := range r.Variables {
+		fmt.Println("::", variable.Expression, " => ", variable.ResolvedValue)
 		if variable.Type == VariableTypeStaticReference {
 			if variable.ResolvedValue != nil {
 				switch v := variable.ResolvedValue.(type) {
@@ -324,11 +314,25 @@ func (r *Resource) ApplyResolvedVariables() error {
 				default:
 					return fmt.Errorf("unknown variable type: %v: type=%v", variable.ResolvedValue, v)
 				}
+				vv := vars[variable.Expression]
+				if strings.Contains(vv, "\"") && strings.Contains(vv, "{") {
+					// This is a json string, so we need to wrap it with single quotes and
+					// escape the double quotes.
+					vv = strings.ReplaceAll(vv, "\"", "\\\"")
+					if !strings.HasPrefix(vv, "'") && !strings.HasSuffix(vv, "'") {
+						// vv = "'" + vv + "'"
+					}
+					vars[variable.Expression] = vv
+				}
 			}
 		}
 	}
 
+	fmt.Println("+++ variables:", vars)
+
+	fmt.Println("\n++++++++ old raw", string(r.Raw))
 	r.Raw = r.replaceVariables(vars)
+	fmt.Println("++++++++ new raw\n", string(r.Raw))
 	var newData map[string]interface{}
 	err := yaml.Unmarshal(r.Raw, &newData)
 	if err != nil {

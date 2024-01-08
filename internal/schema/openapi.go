@@ -23,10 +23,15 @@ func (t *OpenAPISchemaTransformer) Transform(rawObject []byte) (*extv1.JSONSchem
 	}
 	openAPIv3Schema := newBaseResource()
 	specSchema := openAPIv3Schema.Properties["spec"]
-	// now we recursively walk the objectMap and build the schema
+	// now we recursively walk the objectMap and build the spec schema
 	if err := t.buildSchema(objectMap, &specSchema); err != nil {
 		return nil, err
 	}
+	// now we can build the status schema
+	/* statusSchema := openAPIv3Schema.Properties["status"]
+	if err := t.buildStatusSchema(rawObject, &statusSchema); err != nil {
+		return nil, err
+	} */
 	return openAPIv3Schema, nil
 }
 

@@ -80,10 +80,12 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 	if err != nil {
 		return err
 	} */
+	fmt.Println("+ resolving variables")
 	err = o.mainGraph.ResolvedVariables()
 	if err != nil {
 		return err
 	}
+	fmt.Println("+ replacing variables")
 	err = o.mainGraph.ReplaceVariables()
 	if err != nil {
 		return err
@@ -120,7 +122,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		observed, err := rc.Get(ctx, rname, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				fmt.Println("             => resource not found, creating")
+				fmt.Println("             => resource not found, creating using", gvr, namespace)
 				_, err := rc.Create(ctx, rUnstructured, metav1.CreateOptions{})
 				b, _ := rUnstructured.MarshalJSON()
 				fmt.Println(string(b))
@@ -177,4 +179,13 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 
 	o.stateTracker.String()
 	return nil
+}
+
+func (o *Operator) patchClaimStatus(ctx context.Context, status map[string]interface{}) error {
+	claim := o.mainGraph.Claim
+	claim.Object["status"] = status
+	claimUnstructured := claim.Unstructured
+	client := o.client.Resource(o.target)
+	_, err := client.Namespace(claimUnstructured.GetNamespace()).UpdateStatus(ctx, claimUnstructured, metav1.UpdateOptions{})
+	return err
 }
