@@ -258,8 +258,15 @@ func detectCyclicDependencies(resource *Resource, resources []*Resource, seen ma
 // The variables are resolved by looking at the claim's spec and other resources spec.
 func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resource, error) {
 	resolver := NewResolver(g)
+	for _, resource := range g.Resources {
+		fmt.Println(".... resource main has status: ", resource.RuntimeID, resource.HasStatus())
+	}
 
 	copyResources := copyResources(g.Resources)
+	// list of resources that have a status
+	for _, resource := range copyResources {
+		fmt.Println(".... resource copy has status: ", resource.RuntimeID, resource.HasStatus())
+	}
 
 	for _, resource := range copyResources {
 		for _, variable := range resource.Variables {
@@ -280,10 +287,14 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 					variable.ResolvedValue = variableValue
 
 				case VariableKindResourceStatusReference:
-					fmt.Println("  => variableKind: ", variable.Kind)
+					fmt.Println("++ resolving status variable: ", trimedExpression, "from", resource.RuntimeID)
 					targetResource, err := g.GetResource(variable.SrcRef.RuntimeID)
 					if err != nil {
 						return nil, fmt.Errorf("!!! couldn't resolve resource variable: %v: %v", trimedExpression, err)
+					}
+					fmt.Println("++ target has statuss: ", targetResource.RuntimeID, " => ", targetResource.HasStatus())
+					if !targetResource.HasStatus() {
+						fmt.Println("++ target has no statuss: ", targetResource.RuntimeID, " => ", targetResource.Data)
 					}
 					if targetResource.HasStatus() {
 						variableValue, err := resolver.ResolverFromResource(trimedExpression, resource)
@@ -291,7 +302,6 @@ func (g *Graph) GetResourcesWithResolvedStaticVariables(claim Claim) ([]*Resourc
 							return nil, fmt.Errorf("couldn't resolve resource variable: %v: %v", trimedExpression, err)
 						}
 						variable.ResolvedValue = variableValue
-						fmt.Println("  => variableValue: ", variableValue)
 					}
 				}
 			}
@@ -306,7 +316,6 @@ func (r *Resource) ApplyResolvedVariables() error {
 	for _, variable := range r.Variables {
 		if variable.Type == VariableTypeStaticReference {
 			if variable.ResolvedValue != nil {
-				fmt.Println("Applyinh value: ", variable.Expression, variable.ResolvedValue)
 				switch v := variable.ResolvedValue.(type) {
 				case string:
 					vars[variable.Expression] = v
@@ -319,8 +328,6 @@ func (r *Resource) ApplyResolvedVariables() error {
 		}
 	}
 
-	fmt.Println("  => vars: ", vars)
-
 	r.Raw = r.replaceVariables(vars)
 	var newData map[string]interface{}
 	err := yaml.Unmarshal(r.Raw, &newData)
@@ -329,12 +336,11 @@ func (r *Resource) ApplyResolvedVariables() error {
 	}
 	r.Data = newData
 
-	fmt.Println("  => new data: ", r.Data)
 	return nil
 }
 
 func (g *Graph) TopologicalSort() error {
-	orderedResources, err := g.getCreationOrder()
+	orderedResources, err := g.topologicalSort()
 	if err != nil {
 		return err
 	}
@@ -351,6 +357,15 @@ func (g *Graph) ResolvedVariables() error {
 	return nil
 }
 
+func (g *Graph) PrintVariables() {
+	for _, resource := range g.Resources {
+		fmt.Println("Resource: ", resource.RuntimeID)
+		for _, variable := range resource.Variables {
+			fmt.Println("::", variable.Expression, " => ", variable.ResolvedValue)
+		}
+	}
+}
+
 func (g *Graph) ReplaceVariables() error {
 	for _, resource := range g.Resources {
 		if err := resource.ApplyResolvedVariables(); err != nil {
@@ -358,4 +373,12 @@ func (g *Graph) ReplaceVariables() error {
 		}
 	}
 	return nil
+}
+
+func (g *Graph) String() {
+	fmt.Println("---")
+	for _, r := range g.Resources {
+		fmt.Println(string(r.Raw))
+		fmt.Println("---")
+	}
 }

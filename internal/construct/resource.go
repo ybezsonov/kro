@@ -57,6 +57,7 @@ func (r *Resource) SetStatus(status map[string]interface{}) error {
 		return err
 	}
 	r.Raw = raw
+	fmt.Println("SET STATUS FOR RESOURCE: ", r.RuntimeID)
 	return nil
 }
 

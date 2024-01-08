@@ -76,10 +76,10 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 	o.log.Info("Setting claim in graph", "name", req.NamespacedName)
 	o.mainGraph.Claim = construct.Claim{Unstructured: claimUnstructured}
 
-	err = o.mainGraph.TopologicalSort()
+	/* err = o.mainGraph.TopologicalSort()
 	if err != nil {
 		return err
-	}
+	} */
 	err = o.mainGraph.ResolvedVariables()
 	if err != nil {
 		return err
@@ -89,11 +89,15 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
-	fmt.Println("     => starting graph execution")
-	for _, resource := range o.mainGraph.Resources {
-		fmt.Println("         => resource: ", resource.RuntimeID)
-		fmt.Println("             => current state: ", o.stateTracker.GetState(resource.RuntimeID))
-		fmt.Println("             => dependencies ready: ", o.stateTracker.ResourceDependenciesReady(resource.RuntimeID))
+	fmt.Println("_____________")
+	o.stateTracker.String()
+
+	fmt.Println("     +> starting graph execution")
+	for i := range o.mainGraph.Resources {
+		resource := o.mainGraph.Resources[i]
+		fmt.Println("         +> resource: ", resource.RuntimeID)
+		fmt.Println("             +> current state: ", o.stateTracker.GetState(resource.RuntimeID))
+		fmt.Println("             +> dependencies ready: ", o.stateTracker.ResourceDependenciesReady(resource.RuntimeID))
 		if !o.stateTracker.ResourceDependenciesReady(resource.RuntimeID) {
 			return requeue.NeededAfter(fmt.Errorf("resource dependencies not ready"), 5)
 		}
@@ -137,23 +141,31 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 			observedStatus, ok := observed.Object["status"]
 			fmt.Println("             => resource has status", ok)
 			if ok {
-				fmt.Println("             => setting status", observedStatus)
+				// fmt.Println("             => setting status", observedStatus)
+				fmt.Println("** setting status for", resource.RuntimeID, observed.Object["status"])
 				err := resource.SetStatus(observedStatus.(map[string]interface{}))
 				if err != nil {
 					return err
 				}
+				fmt.Println("status set successfully?", resource.HasStatus())
 				fmt.Println("             => resource status set TO READY")
 				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
+				// list resources that
+
 				// ...
+				fmt.Println("::: pre")
+				// o.mainGraph.PrintVariables()
 				err = o.mainGraph.ResolvedVariables()
 				if err != nil {
 					return err
 				}
+				fmt.Println("::: post")
+				o.mainGraph.PrintVariables()
 				err = o.mainGraph.ReplaceVariables()
 				if err != nil {
 					return err
 				}
-				fmt.Println("			 => raw data: ", resource.Data)
+				// fmt.Println("			 => raw data: ", resource.Data)
 			}
 		}
 	}
@@ -163,5 +175,6 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 	}
 	fmt.Println("     => all resources are ready. done")
 
+	o.stateTracker.String()
 	return nil
 }

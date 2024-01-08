@@ -1,5 +1,10 @@
 package construct
 
+import (
+	"fmt"
+	"sort"
+)
+
 type ResourceState string
 
 const (
@@ -70,4 +75,22 @@ func (s *StateTracker) AllReady() bool {
 		}
 	}
 	return true
+}
+
+// need to be ordered
+func (s *StateTracker) String() {
+	order := []string{}
+	for _, resource := range s.ResourceStates {
+		order = append(order, resource.RuntimeID)
+	}
+	sort.Strings(order)
+	for _, runtimeID := range order {
+		resource := s.ResourceStates[runtimeID]
+		fmt.Println("  => resource: ", resource.RuntimeID)
+		fmt.Println("      => state: ", resource.State)
+		fmt.Println("      => dependencies: ")
+		for _, dependency := range resource.Dependencies {
+			fmt.Println("          => ", dependency.RuntimeID)
+		}
+	}
 }

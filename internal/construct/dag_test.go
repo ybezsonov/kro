@@ -541,3 +541,77 @@ func TestGraphStaticResolvingStatus(t *testing.T) {
 	require.Equal(t, "c3-state-is-ready", c4.Data["spec"].(map[string]interface{})["staticStatusRefFromC3"])
 	// fmt.Println(c4.Data["spec"].(map[string]interface{})["staticStatusRefFromC3"])
 }
+
+var (
+	X1 = `
+kind: X
+metadata:
+  name: a-name
+spec:
+  ref: nothing
+`
+	Y1 = `
+kind: Y
+metadata:
+  name: a-name
+spec:
+  ref: nothing
+`
+
+	Z1 = `
+kind: Z
+metadata:
+  name: tttname
+spec:
+  field: ${X.status.status}
+  a:
+    c:
+      bield: ${Y.status.status}`
+
+	yClaim = `
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: XYZClaim
+metadata:
+  name: xyz-claim
+spec:
+  name: xyz-claim`
+)
+
+func Test_MultiStageVariableReplcements(t *testing.T) {
+	resourceX := v1alpha1.Resource{
+		Name:       "X",
+		Definition: runtime.RawExtension{Raw: []byte(X1)},
+	}
+	resourceY := v1alpha1.Resource{
+		Name:       "Y",
+		Definition: runtime.RawExtension{Raw: []byte(Y1)},
+	}
+	resourceZ1 := v1alpha1.Resource{
+		Name:       "Z",
+		Definition: runtime.RawExtension{Raw: []byte(Z1)},
+	}
+
+	yClaimUnstruct := make(map[string]interface{})
+	err := yaml.Unmarshal([]byte(yClaim), &yClaimUnstruct)
+	require.NoError(t, err)
+
+	g, err := NewGraph([]v1alpha1.Resource{
+		resourceZ1, resourceX, resourceY,
+	})
+	require.NoError(t, err)
+	g.Claim = Claim{
+		Unstructured: &unstructured.Unstructured{
+			Object: yClaimUnstruct,
+		},
+	}
+
+	err = g.TopologicalSort()
+	require.NoError(t, err)
+	err = g.ResolvedVariables()
+	require.NoError(t, err)
+	err = g.ReplaceVariables()
+	require.NoError(t, err)
+
+	// g.String()
+
+}
