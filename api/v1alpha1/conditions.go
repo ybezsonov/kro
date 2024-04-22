@@ -24,6 +24,9 @@ const (
 	// ConditionTypeGraphSynced indicates the state of the graph in the
 	// in kubernetes cluster.
 	ConditionTypeGraphSynced ConditionType = "symphony.aws.dev/GraphSynced"
+
+	// Conditions for resource state
+
 )
 
 // Condition is the common struct used by all CRDs managed by ACK service

@@ -11,18 +11,21 @@ spec:
       image: string
       replicas: int
   resources:
-  - name: symphonyIRSA
+  - name: secret
     definition:
-      apiVersion: x.symphony.k8s.aws/v1alpha1
-      kind: IRSA
+      apiVersion: v1
+      kind: Secret
       metadata:
-        name: deployment-with-irsa
+        name: dbinstance
+      data:
+        password: ${generateSecret(32)}
+  - name: dbinstance
+    definition:
       spec:
-        awsAccountID: "095708837592"
-        eksOIDC: "oidc.eks.us-east-1.amazonaws.com/id/12345678901234567890"
-        policyDocument: '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:ListAllMyBuckets","Resource":"arn:aws:s3:::*"},{"Effect":"Allow","Action":["s3:List*"],"Resource":["*"]}]}'
-        serviceAccountName: "symphony-managed-service-account"
-        namespace: default
+        masterPassword:
+          secretRef:
+            name: ${secret.metadata.name}
+            key: password
   - name: deployment
     definition:
       apiVersion: apps/v1
@@ -47,3 +50,6 @@ spec:
               image: ${spec.image}
               ports:
               - containerPort: 80
+              env:
+              - name: DB_PASSWORD
+                value: ${secret.data.password}

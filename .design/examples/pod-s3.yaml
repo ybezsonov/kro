@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: Abstraction
 metadata:
   name: pods3.x.symphony.k8s.aws
 spec:
@@ -8,23 +8,24 @@ spec:
   definition:
     spec:
       bucketName: string
+      tags: '[]string'
+  celOptions:
+    define:
+    - name: tags
+      for (i:= 0;${spec.tags}; i++):
+        if (i == 0):
+          value: key_${i%2 == 0}=value${i+10}
+        else:
+          value: ${tags} + key_${i%2 == 0}=value${i+10}
+
+
+      conditional: for (i:= 0;${spec.tags}; i++)
+      conditional_: for(${spec.tags})
+      conditional__: for(${spec.tags})
+      templateDefinition:
+        key: key_${i%2 == 0}
+        value: value${i+10}
   resources:
-  - name: bucketPrimary
-    definition:
-      apiVersion: s3.services.k8s.aws/v1alpha1
-      kind: Bucket
-      metadata:
-        name: ${spec.bucketName}
-      spec:
-        name: ${spec.bucketName}
-  - name: bucketSecondary
-    definition:
-      apiVersion: s3.services.k8s.aws/v1alpha1
-      kind: Bucket
-      metadata:
-        name: ${spec.bucketName}-secondary
-      spec:
-        name: ${spec.bucketName}-secondary
   - name: pod
     definition:
       apiVersion: v1
@@ -42,3 +43,30 @@ spec:
           env:
           - name: SECONDARY_BUCKET_LOCATION
             value: ${bucketSecondary.status.location}
+  - name: bucketPrimary
+    definition:
+      apiVersion: s3.services.k8s.aws/v1alpha1
+      kind: Bucket
+      metadata:
+        name: ${spec.bucketName}
+      spec:
+        name: ${spec.bucketName}
+  - name: bucketSecondary
+    definition:
+      apiVersion: s3.services.k8s.aws/v1alpha1
+      kind: Bucket
+      metadata:
+        name: ${spec.bucketName}-secondary
+      spec:
+        name: ${spec.bucketName}-secondary
+        ${if size(spec.tags) > 0}:
+          tags:
+          ${for i in range(0, 10)}:
+            ${if i%2 == 0}:
+              - key: key_even_${i}
+                value: ${i}
+            ${else}:
+              - key: key_odd_${i}
+                value: ${i}
+        ${else}:
+          someotherparams: someothervalues

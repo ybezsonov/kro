@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: Abstraction
 metadata:
   name: circular.x.symphony.k8s.aws
 spec:

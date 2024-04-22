@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: Abstraction
 metadata:
   name: simples3var.x.symphony.k8s.aws
 spec:
@@ -14,6 +14,6 @@ spec:
       apiVersion: s3.services.k8s.aws/v1alpha1
       kind: Bucket
       metadata:
-        name: "${spec.name}"
+        name: ${spec.name}
       spec:
-        name: "${spec.name}"
+        name: ${spec.name}

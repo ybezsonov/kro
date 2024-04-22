@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: Abstraction
 metadata:
   name: simples3var.x.symphony.k8s.aws
 spec:
@@ -9,6 +9,16 @@ spec:
     spec:
       name: string
       crName: string
+      numberTags: int
+
+  celOptions:
+    define:
+    - defaultAnnotations:
+        key: value
+    - name: tags
+      definition:
+        key: key_${i%2 == 0}
+        value: value${i+10}${pod.status.conditions[0]}
   resources:
   - name: my-var-bucket
     definition:
@@ -19,10 +29,12 @@ spec:
       spec:
         name: "${spec.name}"
   - name: my-var-bucket-2
+    manageOn: ${spec.createBucket2}
     definition:
       apiVersion: s3.services.k8s.aws/v1alpha1
       kind: Bucket
       metadata:
-        name: ${spec.crName}-2
+        name: ack-${injectRandomPrefix(spec.crName)}-2
       spec:
         name: ${spec.name}-2
+        tags: []

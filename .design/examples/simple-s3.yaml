@@ -1,19 +1,52 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: ResourceGroup
 metadata:
-  name: simples3.x.symphony.k8s.aws
+  name: podbucket.x.symphony.k8s.aws
 spec:
   apiVersion: v1alpha1
-  kind: SimpleS3
-  definition:
+  kind: PodAndBuckets
+  values:
     spec:
-      name: string
+      namePrefix: string
+      enableVersioning: boolean
+    status:
+      awsBucketLocation: ${awsBucket.status.location}
   resources:
-  - name: secure-bucket
+  - name: pod
+    definition:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: pod-with-s3-${randomString(5)}
+      spec:
+        containers:
+        - name: pod
+          image: amazon/aws-cli
+          command:
+          - sh
+          - -c
+          - echo \"AWS bucket location is ${awsBucket.status.location}\"
+          env:
+          - name: AWS_BUCKET_LOCATION
+            value: ${awsBucket.status.location}
+          - name: GCP_BUCKET_LOCATION
+            value: ${gcpStorageBucket.status.location}
+  - name: awsBucket
     definition:
       apiVersion: s3.services.k8s.aws/v1alpha1
       kind: Bucket
       metadata:
-        name: symphony-ack-s3-bucket
+        name: ${spec.namePrefix}-suffix
       spec:
-        name: symphony-ack-s3-bucket
+        name: ${spec.namePrefix}-suffix
+        versioning:
+          status: ${spec.enableVersioning}
+  - name: gcpStorageBucket
+    definition:
+      apiVersion: storage.cnrm.cloud.google.com/v1beta1
+      kind: StorageBucket
+      metadata:
+        name: ${spec.namePrefix}-suffix
+      spec:
+        versioning:
+          enabled: ${spec.enableVersioning}

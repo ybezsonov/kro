@@ -1,17 +1,37 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Abstraction
+kind: Construct
 metadata:
   name: privateekscluster.x.symphony.k8s.aws
 spec:
   apiVersion: v1alpha1
   kind: PrivateEKSCluster
+  definitionFromRef:
+    group: eks.services.k8s.aws
+    version: v1alpha1
+    kind: Cluster
+    actions:
+      status.clusterARN: ${cluster.status.ackMetadata.ARN}
   definition:
     spec:
       name: string
+      config: Config
       version: string
       numNodes: string
+      createBucket: bool
+      bucketName: string
+      tags: '[]Tags'
     status:
-      clusterARN: string
+      clusterARN: ${cluster.status.ackMetadata.ARN}
+  celOptions:
+    define:
+      Tags:
+        key: string
+        valye: string
+      Config:
+        name: string
+        count: int
+        polciies: 'map[string]string'
+
   # Building a cluster with a VPC, subnets, security group, and role
   resources:
   - name: securityGroup
@@ -99,6 +119,8 @@ spec:
             ]
           }
   - name: cluster
+    readyOn: ${status.conditions.contains(ConditionSynced == true)}
+    type: ifelse
     definition:
       apiVersion: eks.services.k8s.aws/v1alpha1
       kind: Cluster
@@ -112,6 +134,7 @@ spec:
           endpointPublicAccess: true
           subnetIDs:
             - ${subnetAZA.status.id}
+            - ${subnetAZB.status.id}
   - name: nodegroup
     definition:
       apiVersion: eks.services.k8s.aws/v1alpha1
@@ -131,3 +154,12 @@ spec:
           minSize: ${spec.numNodes}
           maxSize: ${spec.numNodes}
           desiredSize: ${spec.numNodes}
+  - name: bucket-1
+    createOn: ${spec.createBucket == true}
+    definition:
+      apiVersion: s3.services.k8s.aws/v1alpha1
+      kind: Bucket
+      metadata:
+        name: ${spec.bucketName}
+        annotations:
+          my-cluster: ${cluster.status.oidcURL}
