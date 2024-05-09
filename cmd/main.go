@@ -112,14 +112,14 @@ func main() {
 	dc := dynamiccontroller.NewDynamicController(context.Background(), "dc-system", dynamicClient, nil)
 	go dc.Run(context.Background(), 10)
 
-	if err = (&controller.ConstructReconciler{
+	if err = (&controller.ResourceGroupReconciler{
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
 		CRDManager:        crdManager,
 		OpenAPISchema:     &schema.OpenAPISchemaTransformer{},
 		DynamicController: dc,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Construct")
+		setupLog.Error(err, "unable to create controller", "controller", "ResourceGroup")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

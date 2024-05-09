@@ -1,4 +1,4 @@
-package construct
+package resourcegroup
 
 import (
 	"testing"

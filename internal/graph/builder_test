@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	IRSAConstructSpec = `---
+	IRSAResourceGroupSpec = `---
 definition:
   spec:
     awsAccountID: string
@@ -59,10 +59,10 @@ definition:
 )
 
 func TestBuilder_Build(t *testing.T) {
-	var constructMap map[string]interface{}
-	err := yaml.Unmarshal([]byte(IRSAConstructSpec), &constructMap)
+	var resourcegroupMap map[string]interface{}
+	err := yaml.Unmarshal([]byte(IRSAResourceGroupSpec), &resourcegroupMap)
 	if err != nil {
-		t.Fatalf("couldn't parse yaml data from resource %s: %v", "construct", err)
+		t.Fatalf("couldn't parse yaml data from resource %s: %v", "resourcegroup", err)
 	}
 	var irsaResourceAMap map[string]interface{}
 	err = yaml.Unmarshal([]byte(IRSAResourceA), &irsaResourceAMap)
@@ -76,8 +76,8 @@ func TestBuilder_Build(t *testing.T) {
 	}
 
 	type args struct {
-		rawConstruct       runtime.RawExtension
-		constructResources []*v1alpha1.Resource
+		rawResourceGroup       runtime.RawExtension
+		resourcegroupResources []*v1alpha1.Resource
 	}
 	tests := []struct {
 		name    string
@@ -90,14 +90,14 @@ func TestBuilder_Build(t *testing.T) {
 			name: "empty variables",
 			b:    &Builder{},
 			args: args{
-				rawConstruct:       runtime.RawExtension{},
-				constructResources: []*v1alpha1.Resource{},
+				rawResourceGroup:       runtime.RawExtension{},
+				resourcegroupResources: []*v1alpha1.Resource{},
 			},
 			want: &Collection{
-				Construct: &Resource{
+				ResourceGroup: &Resource{
 					Name:           "main",
 					Data:           nil,
-					Raw:            []byte(IRSAConstructSpec),
+					Raw:            []byte(IRSAResourceGroupSpec),
 					References:     []*Reference{},
 					DependsOn:      []string{},
 					ReferenceNames: []string{},
@@ -107,20 +107,20 @@ func TestBuilder_Build(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "construct only",
+			name: "resourcegroup only",
 			b:    &Builder{},
 			args: args{
-				rawConstruct: runtime.RawExtension{
-					Raw: []byte(IRSAConstructSpec),
+				rawResourceGroup: runtime.RawExtension{
+					Raw: []byte(IRSAResourceGroupSpec),
 				},
 
-				constructResources: []*v1alpha1.Resource{},
+				resourcegroupResources: []*v1alpha1.Resource{},
 			},
 			want: &Collection{
-				Construct: &Resource{
-					Data:           constructMap,
+				ResourceGroup: &Resource{
+					Data:           resourcegroupMap,
 					Name:           "main",
-					Raw:            []byte(IRSAConstructSpec),
+					Raw:            []byte(IRSAResourceGroupSpec),
 					ReferenceNames: []string{},
 					References:     []*Reference{},
 					DependsOn:      []string{},
@@ -134,19 +134,19 @@ func TestBuilder_Build(t *testing.T) {
 			name: "two resources with dependency",
 			b:    &Builder{},
 			args: args{
-				rawConstruct: runtime.RawExtension{
-					Raw: []byte(IRSAConstructSpec),
+				rawResourceGroup: runtime.RawExtension{
+					Raw: []byte(IRSAResourceGroupSpec),
 				},
-				constructResources: []*v1alpha1.Resource{
+				resourcegroupResources: []*v1alpha1.Resource{
 					{Definition: runtime.RawExtension{Raw: []byte(IRSAResourceA)}, Name: "irsa-policy"},
 					{Definition: runtime.RawExtension{Raw: []byte(IRSAResourceB)}, Name: "service-account"},
 				},
 			},
 			want: &Collection{
-				Construct: &Resource{
+				ResourceGroup: &Resource{
 					Name:           "main",
-					Data:           constructMap,
-					Raw:            []byte(IRSAConstructSpec),
+					Data:           resourcegroupMap,
+					Raw:            []byte(IRSAResourceGroupSpec),
 					DependsOn:      []string{},
 					ReferenceNames: []string{},
 					References:     []*Reference{},
@@ -200,7 +200,7 @@ func TestBuilder_Build(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			b := &Builder{}
-			got, err := b.Build(tt.args.rawConstruct, tt.args.constructResources)
+			got, err := b.Build(tt.args.rawResourceGroup, tt.args.resourcegroupResources)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Builder.Build() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -213,8 +213,8 @@ func TestBuilder_Build(t *testing.T) {
 				}
 			}
 
-			if !reflect.DeepEqual(got.Construct, tt.want.Construct) {
-				t.Errorf("Builder.Build().Construct = %+v, want %+v", got, tt.want)
+			if !reflect.DeepEqual(got.ResourceGroup, tt.want.ResourceGroup) {
+				t.Errorf("Builder.Build().ResourceGroup = %+v, want %+v", got, tt.want)
 			}
 			for i, resource := range got.Resources {
 				if !reflect.DeepEqual(got.Resources[i], resource) {

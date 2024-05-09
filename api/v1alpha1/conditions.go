@@ -12,7 +12,7 @@ const (
 	// in kubernetes cluster.
 	ConditionTypeResourceSynced ConditionType = "symphony.aws.dev/ResourceSynced"
 	// ConditionTypeReconcilerReady indicates the state of the reconciler.
-	// Whenever an Construct resource is created, Symphony will spin up a
+	// Whenever an ResourceGroup resource is created, Symphony will spin up a
 	// reconciler for that resource. This condition indicates the state of the
 	// reconciler.
 	ConditionTypeReconcilerReady ConditionType = "symphony.aws.dev/ReconcilerReady"

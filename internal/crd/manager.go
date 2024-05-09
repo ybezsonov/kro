@@ -27,7 +27,7 @@ func (m *Manager) Create(ctx context.Context, crd v1.CustomResourceDefinition) e
 	crd.OwnerReferences = []metav1.OwnerReference{
 		{
 			Name:       "symphony-controller",
-			Kind:       "Construct",
+			Kind:       "ResourceGroup",
 			APIVersion: "x.symphony.k8s.aws/v1alpha1",
 			Controller: &[]bool{false}[0],
 			UID:        "00000000-0000-0000-0000-000000000000",

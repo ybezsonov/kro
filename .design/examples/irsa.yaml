@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: ResourceGroup
 metadata:
   name: irsa.x.symphony.k8s.aws
 spec:
@@ -13,8 +13,9 @@ spec:
       serviceAccountName: string
       namespace: string
     status:
-      serviceAccountName: string
-      roleName: string
+      serviceAccountName: ${}
+      roleName: ${}
+
   resources:
   - name: irsaPolicy
     definition:

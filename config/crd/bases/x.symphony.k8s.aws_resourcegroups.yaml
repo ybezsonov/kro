@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: constructs.x.symphony.k8s.aws
+  name: resourcegroups.x.symphony.k8s.aws
 spec:
   group: x.symphony.k8s.aws
   names:
-    kind: Construct
-    listKind: ConstructList
-    plural: constructs
-    singular: construct
+    kind: ResourceGroup
+    listKind: ResourceGroupList
+    plural: resourcegroups
+    singular: resourcegroup
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Construct is the Schema for the constructs API
+        description: ResourceGroup is the Schema for the resourcegroups API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -32,7 +32,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ConstructSpec defines the desired state of Construct
+            description: ResourceGroupSpec defines the desired state of ResourceGroup
             properties:
               apiVersion:
                 type: string
@@ -63,7 +63,7 @@ spec:
                 type: array
             type: object
           status:
-            description: ConstructStatus defines the observed state of Construct
+            description: ResourceGroupStatus defines the observed state of ResourceGroup
             properties:
               conditions:
                 description: Conditions represent the latest available observations
@@ -106,13 +106,13 @@ spec:
                   type: object
                 type: array
               graphState:
-                description: GraphState is the state of the construct graph
+                description: GraphState is the state of the resourcegroup graph
                 type: string
               state:
-                description: State is the state of the construct
+                description: State is the state of the resourcegroup
                 type: string
               topologicalOrder:
-                description: TopologicalOrder is the topological order of the construct
+                description: TopologicalOrder is the topological order of the resourcegroup
                   graph
                 items:
                   type: string

@@ -18,7 +18,7 @@ func Test_parseDataCEL(t *testing.T) {
 		{
 			name: "1",
 			args: args{
-				raw:  []byte(IRSAConstructSpec),
+				raw:  []byte(IRSAResourceGroupSpec),
 				path: "defintion.spec.eksOIDC",
 			},
 			want:    "string",
@@ -27,7 +27,7 @@ func Test_parseDataCEL(t *testing.T) {
 		{
 			name: "2",
 			args: args{
-				raw:  []byte(IRSAConstructSpec),
+				raw:  []byte(IRSAResourceGroupSpec),
 				path: "defintion.spec.tags",
 			},
 			want:    "map[string]string",

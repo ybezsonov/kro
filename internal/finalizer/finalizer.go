@@ -5,19 +5,19 @@ import (
 )
 
 const (
-	// Symphony construct finalizer
+	// Symphony resourcegroup finalizer
 	SymphonyFinalizer = "symphony.io/finalizer"
 )
 
-func IsSymphonyManaged(c *v1alpha1.Construct) bool {
+func IsSymphonyManaged(c *v1alpha1.ResourceGroup) bool {
 	return (&Manager{finalizers: []string{SymphonyFinalizer}}).HaveAllFinalizers(c.Finalizers)
 }
 
-func AddSymphonyFinalizer(c *v1alpha1.Construct) []string {
+func AddSymphonyFinalizer(c *v1alpha1.ResourceGroup) []string {
 	return (&Manager{finalizers: []string{SymphonyFinalizer}}).AddFinalizers(c.Finalizers)
 }
 
-func RemoveSymphonyFinalizer(c *v1alpha1.Construct) []string {
+func RemoveSymphonyFinalizer(c *v1alpha1.ResourceGroup) []string {
 	return (&Manager{finalizers: []string{SymphonyFinalizer}}).RemoveFinalizers(c.Finalizers)
 }
 

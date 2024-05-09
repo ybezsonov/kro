@@ -22,20 +22,20 @@ type ReferenceType string
 
 const (
 	// ReferenceTypeSpec indicates that the reference is targetting a
-	// spec field of the ConstructClaim resource.
+	// spec field of the ResourceGroupClaim resource.
 	ReferenceTypeSpec ReferenceType = "spec"
 	// ReferenceTypeStatus indicates that the reference is targetting a
-	// status field of the ConstructClaim resource.
+	// status field of the ResourceGroupClaim resource.
 	// This is not possible...
 	ReferenceTypeStatus ReferenceType = "status"
 	// ReferenceTypeAnnotation indicates that the reference is targetting an
-	// annotation field of the ConstructClaim resource.
+	// annotation field of the ResourceGroupClaim resource.
 	ReferenceTypeAnnotation ReferenceType = "annotation"
 	// ReferenceTypeMetadata indicates that the reference is targetting a
-	// metadata field of the ConstructClaim resource.
+	// metadata field of the ResourceGroupClaim resource.
 	ReferenceTypeMetadata ReferenceType = "metadata"
 	// ReferenceTypeResource indicates that the reference is targetting a
-	// another resource that is part of the Construct collection.
+	// another resource that is part of the ResourceGroup collection.
 	ReferenceTypeResource ReferenceType = "resource"
 )
 

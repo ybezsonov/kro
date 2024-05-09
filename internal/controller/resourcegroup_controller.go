@@ -35,8 +35,8 @@ import (
 	openapischema "github.com/aws/symphony/internal/schema"
 )
 
-// ConstructReconciler reconciles a Construct object
-type ConstructReconciler struct {
+// ResourceGroupReconciler reconciles a ResourceGroup object
+type ResourceGroupReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
 	CRDManager        crd.Manager
@@ -44,35 +44,35 @@ type ConstructReconciler struct {
 	DynamicController *dynamiccontroller.DynamicController
 }
 
-//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=constructs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=constructs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=constructs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=resourcegroups,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=resourcegroups/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=x.symphony.k8s.aws,resources=resourcegroups/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the Construct object against the actual cluster state, and then
+// the ResourceGroup object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
-func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ResourceGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 	log.Info("Reconciling", "resource", req.NamespacedName)
 
-	var construct v1alpha1.Construct
-	err := r.Get(ctx, req.NamespacedName, &construct)
+	var resourcegroup v1alpha1.ResourceGroup
+	err := r.Get(ctx, req.NamespacedName, &resourcegroup)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	log.Info("Got construct from the api server", "name", req.NamespacedName)
+	log.Info("Got resourcegroup from the api server", "name", req.NamespacedName)
 
-	log.Info("Transforming construct definition to OpenAPIv3 schema", "name", req.NamespacedName)
+	log.Info("Transforming resourcegroup definition to OpenAPIv3 schema", "name", req.NamespacedName)
 
 	// Handle creation
-	oaSchema, err := r.OpenAPISchema.Transform(construct.Spec.Definition.Spec.Raw, construct.Spec.Definition.Status.Raw)
+	oaSchema, err := r.OpenAPISchema.Transform(resourcegroup.Spec.Definition.Spec.Raw, resourcegroup.Spec.Definition.Status.Raw)
 	if err != nil {
 		log.Info("unable to transform OpenAPI schema")
 		return ctrl.Result{}, err
@@ -85,7 +85,7 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	   	}
 	   	fmt.Println(string(yamlSchema)) */
 
-	customRD := crd.FromOpenAPIV3Schema(construct.Spec.ApiVersion, construct.Spec.Kind, oaSchema)
+	customRD := crd.FromOpenAPIV3Schema(resourcegroup.Spec.ApiVersion, resourcegroup.Spec.Kind, oaSchema)
 
 	/* 	bb, err := yaml.Marshal(customRD)
 	   	if err != nil {
@@ -108,8 +108,8 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}
 
 	// Handle deletions
-	if !construct.ObjectMeta.DeletionTimestamp.IsZero() {
-		log.Info("construct is deleted")
+	if !resourcegroup.ObjectMeta.DeletionTimestamp.IsZero() {
+		log.Info("resourcegroup is deleted")
 		err := r.CRDManager.Delete(ctx, customRD.Name)
 		if err != nil {
 			log.Info("unable to delete CRD")
@@ -119,8 +119,8 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		r.DynamicController.UnregisterGVK(gvr)
 		log.Info("Unregistering workflow operator in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
 		r.DynamicController.UnregisterWorkflowOperator(gvr)
-		log.Info("Removing finalizer from construct", "crd_name", customRD.Name, "gvr", gvr)
-		err = r.setUnmanaged(ctx, &construct)
+		log.Info("Removing finalizer from resourcegroup", "crd_name", customRD.Name, "gvr", gvr)
+		err = r.setUnmanaged(ctx, &resourcegroup)
 		if err != nil {
 			log.Info("unable to set unmanaged")
 			return ctrl.Result{}, err
@@ -137,10 +137,10 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	orderedResources, err := r.DynamicController.RegisterWorkflowOperator(
 		ctx,
 		gvr,
-		&construct,
+		&resourcegroup,
 	)
 	if err != nil {
-		if err := r.setStatusInactive(ctx, &construct, err); err != nil {
+		if err := r.setStatusInactive(ctx, &resourcegroup, err); err != nil {
 			log.Info("unable to set status inactive")
 			return ctrl.Result{}, err
 		}
@@ -150,12 +150,12 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Set managed
 	log.Info("Setting symphony finalizers", "crd_name", customRD.Name, "gvr", gvrStr)
-	err = r.setManaged(ctx, &construct)
+	err = r.setManaged(ctx, &resourcegroup)
 	if err != nil {
 		log.Info("unable to set managed")
 		return ctrl.Result{}, err
 	}
-	err = r.setStatusActive(ctx, &construct, orderedResources)
+	err = r.setStatusActive(ctx, &resourcegroup, orderedResources)
 	if err != nil {
 		log.Info("unable to set status active")
 		return ctrl.Result{}, err
@@ -165,28 +165,28 @@ func (r *ConstructReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ConstructReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ResourceGroupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.Construct{}).
+		For(&v1alpha1.ResourceGroup{}).
 		Complete(r)
 }
 
-func (r *ConstructReconciler) setManaged(ctx context.Context, construct *v1alpha1.Construct) error {
-	newFinalizers := finalizer.AddSymphonyFinalizer(construct)
-	dc := construct.DeepCopy()
+func (r *ResourceGroupReconciler) setManaged(ctx context.Context, resourcegroup *v1alpha1.ResourceGroup) error {
+	newFinalizers := finalizer.AddSymphonyFinalizer(resourcegroup)
+	dc := resourcegroup.DeepCopy()
 	dc.Finalizers = newFinalizers
-	if len(dc.Finalizers) != len(construct.Finalizers) {
+	if len(dc.Finalizers) != len(resourcegroup.Finalizers) {
 		fmt.Println("  => setting finalizers to: ", newFinalizers)
-		patch := client.MergeFrom(construct.DeepCopy())
+		patch := client.MergeFrom(resourcegroup.DeepCopy())
 		return r.Patch(ctx, dc.DeepCopy(), patch)
 	}
 	return nil
 }
 
-func (r *ConstructReconciler) setStatusActive(
-	ctx context.Context, construct *v1alpha1.Construct, orderedResources []string,
+func (r *ResourceGroupReconciler) setStatusActive(
+	ctx context.Context, resourcegroup *v1alpha1.ResourceGroup, orderedResources []string,
 ) error {
-	dc := construct.DeepCopy()
+	dc := resourcegroup.DeepCopy()
 	dc.Status.State = "ACTIVE"
 	dc.Status.TopoligicalOrder = orderedResources
 	conditions := dc.Status.Conditions
@@ -205,18 +205,18 @@ func (r *ConstructReconciler) setStatusActive(
 		),
 	)
 	dc.Status.Conditions = newConditions
-	patch := client.MergeFrom(construct.DeepCopy())
+	patch := client.MergeFrom(resourcegroup.DeepCopy())
 	// data, _ := patch.Data(dc)
 	return r.Status().Patch(ctx, dc.DeepCopy(), patch)
 }
 
-func (r *ConstructReconciler) setStatusInactive(ctx context.Context, construct *v1alpha1.Construct, err error) error {
-	dc := construct.DeepCopy()
+func (r *ResourceGroupReconciler) setStatusInactive(ctx context.Context, resourcegroup *v1alpha1.ResourceGroup, err error) error {
+	dc := resourcegroup.DeepCopy()
 	dc.Status.State = "INACTIVE"
 	conditions := dc.Status.Conditions
 	newConditions := condition.SetCondition(conditions,
 		condition.NewReconcilerReadyCondition(
-			corev1.ConditionTrue,
+			corev1.ConditionFalse,
 			"",
 			"micro controller is ready",
 		),
@@ -225,20 +225,20 @@ func (r *ConstructReconciler) setStatusInactive(ctx context.Context, construct *
 		condition.NewGraphSyncedCondition(
 			corev1.ConditionFalse,
 			err.Error(),
-			"Directed Acyclic Graph is not synced",
+			"Directed Acyclic Graph is synced",
 		),
 	)
 	dc.Status.Conditions = newConditions
-	patch := client.MergeFrom(construct.DeepCopy())
+	patch := client.MergeFrom(resourcegroup.DeepCopy())
 	// data, _ := patch.Data(dc)
 	return r.Status().Patch(ctx, dc.DeepCopy(), patch)
 }
 
-func (r *ConstructReconciler) setUnmanaged(ctx context.Context, construct *v1alpha1.Construct) error {
-	newFinalizers := finalizer.RemoveSymphonyFinalizer(construct)
-	dc := construct.DeepCopy()
+func (r *ResourceGroupReconciler) setUnmanaged(ctx context.Context, resourcegroup *v1alpha1.ResourceGroup) error {
+	newFinalizers := finalizer.RemoveSymphonyFinalizer(resourcegroup)
+	dc := resourcegroup.DeepCopy()
 	dc.Finalizers = newFinalizers
 	fmt.Println("  => unsetting finalizers to: ", newFinalizers)
-	patch := client.MergeFrom(construct.DeepCopy())
+	patch := client.MergeFrom(resourcegroup.DeepCopy())
 	return r.Patch(ctx, dc.DeepCopy(), patch)
 }

@@ -1,12 +1,12 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: ResourceGroup
 metadata:
   labels:
-    app.kubernetes.io/name: construct
-    app.kubernetes.io/instance: construct-sample
+    app.kubernetes.io/name: resourcegroup
+    app.kubernetes.io/instance: resourcegroup-sample
     app.kubernetes.io/part-of: symphony
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: symphony
-  name: construct-sample
+  name: resourcegroup-sample
 spec:
   # TODO(user): Add fields here

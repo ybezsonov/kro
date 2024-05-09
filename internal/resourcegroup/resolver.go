@@ -1,4 +1,4 @@
-package construct
+package resourcegroup
 
 import (
 	"github.com/aws/symphony/internal/cel"

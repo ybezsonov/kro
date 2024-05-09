@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: ResourceGroup
 metadata:
   name: privateekscluster.x.symphony.k8s.aws
 spec:
@@ -22,6 +22,9 @@ spec:
       tags: '[]Tags'
     status:
       clusterARN: ${cluster.status.ackMetadata.ARN}
+    validation:
+    - expression: spec.numSubnets < 4
+      message: expect4ed number of subnets to be 4 or more
   celOptions:
     define:
       Tags:
@@ -120,7 +123,6 @@ spec:
           }
   - name: cluster
     readyOn: ${status.conditions.contains(ConditionSynced == true)}
-    type: ifelse
     definition:
       apiVersion: eks.services.k8s.aws/v1alpha1
       kind: Cluster

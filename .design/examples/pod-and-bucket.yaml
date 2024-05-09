@@ -3,15 +3,32 @@ kind: ResourceGroup
 metadata:
   name: podbucket.x.symphony.k8s.aws
 spec:
+  # CRD GVR
   apiVersion: v1alpha1
   kind: PodAndBuckets
-  values:
+
+  # Variables (CRD Spec/Status)
+  variables:
     spec:
       namePrefix: string
       enableVersioning: boolean
+      numberOfBuckets: int
     status:
       awsBucketLocation: ${awsBucket.status.location}
+
+  # Resources
   resources:
+  - name: awsBucket
+    definition:
+      apiVersion: s3.services.k8s.aws/v1alpha1
+      kind: Bucket
+      metadata:
+        name: ${spec.namePrefix}-suffix
+      spec:
+        name: ${spec.namePrefix}-suffix
+        versioning:
+          status: ${spec.enableVersioning}
+
   - name: pod
     definition:
       apiVersion: v1
@@ -29,24 +46,3 @@ spec:
           env:
           - name: AWS_BUCKET_LOCATION
             value: ${awsBucket.status.location}
-          - name: GCP_BUCKET_LOCATION
-            value: ${gcpStorageBucket.status.location}
-  - name: awsBucket
-    definition:
-      apiVersion: s3.services.k8s.aws/v1alpha1
-      kind: Bucket
-      metadata:
-        name: ${spec.namePrefix}-suffix
-      spec:
-        name: ${spec.namePrefix}-suffix
-        versioning:
-          status: ${spec.enableVersioning}
-  - name: gcpStorageBucket
-    definition:
-      apiVersion: storage.cnrm.cloud.google.com/v1beta1
-      kind: StorageBucket
-      metadata:
-        name: ${spec.namePrefix}-suffix
-      spec:
-        versioning:
-          enabled: ${spec.enableVersioning}

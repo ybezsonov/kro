@@ -24,8 +24,8 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
-// ConstructSpec defines the desired state of Construct
-type ConstructSpec struct {
+// ResourceGroupSpec defines the desired state of ResourceGroup
+type ResourceGroupSpec struct {
 	// +kubebuilder:validation:Required
 	Kind string `json:"kind,omitempty"`
 	// +kubebuilder:validation:Required
@@ -50,13 +50,13 @@ type Resource struct {
 	Definition runtime.RawExtension `json:"definition,omitempty"`
 }
 
-// ConstructStatus defines the observed state of Construct
-type ConstructStatus struct {
-	// State is the state of the construct
+// ResourceGroupStatus defines the observed state of ResourceGroup
+type ResourceGroupStatus struct {
+	// State is the state of the resourcegroup
 	State string `json:"state,omitempty"`
-	// GraphState is the state of the construct graph
+	// GraphState is the state of the resourcegroup graph
 	GraphState string `json:"graphState,omitempty"`
-	// TopologicalOrder is the topological order of the construct graph
+	// TopologicalOrder is the topological order of the resourcegroup graph
 	TopoligicalOrder []string `json:"topologicalOrder,omitempty"`
 	// Conditions represent the latest available observations of an object's state
 	Conditions []Condition `json:"conditions,omitempty"`
@@ -65,24 +65,24 @@ type ConstructStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Construct is the Schema for the constructs API
-type Construct struct {
+// ResourceGroup is the Schema for the resourcegroups API
+type ResourceGroup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ConstructSpec   `json:"spec,omitempty"`
-	Status ConstructStatus `json:"status,omitempty"`
+	Spec   ResourceGroupSpec   `json:"spec,omitempty"`
+	Status ResourceGroupStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ConstructList contains a list of Construct
-type ConstructList struct {
+// ResourceGroupList contains a list of ResourceGroup
+type ResourceGroupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Construct `json:"items"`
+	Items           []ResourceGroup `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Construct{}, &ConstructList{})
+	SchemeBuilder.Register(&ResourceGroup{}, &ResourceGroupList{})
 }

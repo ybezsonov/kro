@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/aws/symphony/api/v1alpha1"
-	"github.com/aws/symphony/internal/construct"
 	"github.com/aws/symphony/internal/requeue"
+	"github.com/aws/symphony/internal/resourcegroup"
 	"github.com/aws/symphony/internal/workflow"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
@@ -31,11 +31,12 @@ import (
 )
 
 type DynamicController struct {
-	// name is an identifier for this particular controller instance.
+	// name is an identifier for this particular controller instance. Useless but I like naming things.
 	name string
 	// kubeClient is a dynamic client to the Kubernetes cluster.
 	kubeClient *dynamic.DynamicClient
-	// synced informs if the controller is synced with the apiserver
+	// synced informs if the controller is synced with the apiserver.
+	// This is an aggregation of all the InformerSynced.
 	synced cache.InformerSynced
 	// workflowOperators is a map of the registered workflow operators
 	workflowOperators map[schema.GroupVersionResource]*workflow.Operator
@@ -44,9 +45,12 @@ type DynamicController struct {
 	// castable to the appropriate type.
 	//
 	// Note(a-hilaly) maybe unstructured.Unstructured is a better choice here.
-	handlerO func(context.Context, ctrl.Request) error
+	handler func(context.Context, ctrl.Request) error
+
 	// queue is where incoming work is placed to de-dup and to allow "easy"
 	// rate limited requeues.
+	//
+	// Might need multiple queues? one for each registered resource group? How about priority queues.
 	queue workqueue.RateLimitingInterface
 	// informers is a the map of the registered informers
 	informers   map[schema.GroupVersionResource]dynamicinformer.DynamicSharedInformerFactory
@@ -77,7 +81,7 @@ func NewDynamicController(
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		), "dynamic-controller-queue"),
-		handlerO:          handler,
+		handler:           handler,
 		informers:         map[schema.GroupVersionResource]dynamicinformer.DynamicSharedInformerFactory{},
 		cancelFuncs:       map[schema.GroupVersionResource]context.CancelFunc{},
 		log:               &logger,
@@ -97,9 +101,9 @@ func (cc *DynamicController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting symphony dynamic controller", "name", cc.name)
 	defer logger.Info("Shutting symphony dynamic controller", "name", cc.name)
 
-	/* 	if !cache.WaitForNamedCacheSync(cc.name, ctx.Done(), cc.synced) {
+	if !cache.WaitForNamedCacheSync(cc.name, ctx.Done(), cc.synced) {
 		return
-	} */
+	}
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, cc.worker, time.Second)
@@ -151,13 +155,13 @@ func (cc *DynamicController) enqueueObject(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
 	}
-	// obj is a claim of a defined construct, we do not know much about the contruct
+	// obj is a claim of a defined resourcegroup, we do not know much about the contruct
 	// so we enqueue two things:
 	//   - the claim key (namespacedName)
 	//   - the GVR of the claim (this will be usefull to know which handler to call)
 	//
 	// The reason we have so many handlers is because those handlers are compiled graphs
-	// with a set of workflow steps that are specific to the construct.
+	// with a set of workflow steps that are specific to the resourcegroup.
 
 	// Since we are using a dynamic informer/client, it is guaranteed that the object is
 	// a pointer to unstructured.Unstructured.
@@ -193,7 +197,7 @@ func (cc *DynamicController) syncFunc(ctx context.Context, oi ObjectIdentifiers)
 	logger := log.FromContext(ctx)
 	startTime := time.Now()
 	defer func() {
-		logger.Info("Finished syncing construct claim request", "elapsedTime", time.Since(startTime))
+		logger.Info("Finished syncing resourcegroup claim request", "elapsedTime", time.Since(startTime))
 	}()
 
 	fmt.Println("====================================")
@@ -304,18 +308,18 @@ func (cc *DynamicController) HotRestart() bool {
 func (dc *DynamicController) RegisterWorkflowOperator(
 	ctx context.Context,
 	gvr schema.GroupVersionResource,
-	c *v1alpha1.Construct,
+	c *v1alpha1.ResourceGroup,
 ) ([]string, error) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 
-	dc.log.Info("Creating construct graph", "name", c.Name)
+	dc.log.Info("Creating resourcegroup graph", "name", c.Name)
 	resources := make([]v1alpha1.Resource, 0)
 	for _, resource := range c.Spec.Resources {
 		resources = append(resources, *resource)
 	}
 
-	graph, err := construct.NewGraph(resources)
+	graph, err := resourcegroup.NewGraph(resources)
 	if err != nil {
 		return nil, err
 	}

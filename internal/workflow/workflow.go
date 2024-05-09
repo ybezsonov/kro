@@ -18,8 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/aws/symphony/api/v1alpha1"
-	"github.com/aws/symphony/internal/construct"
 	"github.com/aws/symphony/internal/requeue"
+	"github.com/aws/symphony/internal/resourcegroup"
 )
 
 // This package transforms the Resource Graph into a Workflow matrix.
@@ -28,7 +28,7 @@ import (
 func NewOperator(
 	ctx context.Context,
 	target schema.GroupVersionResource,
-	g *construct.Graph,
+	g *resourcegroup.Graph,
 	client *dynamic.DynamicClient,
 ) *Operator {
 	log := log.FromContext(ctx)
@@ -38,8 +38,8 @@ func NewOperator(
 		target:       target,
 		client:       client,
 		mainGraph:    g,
-		stateGraphs:  make(map[string]*construct.Graph),
-		stateTracker: construct.NewStateTracker(g),
+		stateGraphs:  make(map[string]*resourcegroup.Graph),
+		stateTracker: resourcegroup.NewStateTracker(g),
 	}
 }
 
@@ -49,9 +49,9 @@ type Operator struct {
 	log           *logr.Logger
 	target        schema.GroupVersionResource
 	client        *dynamic.DynamicClient
-	mainGraph     *construct.Graph
-	stateGraphs   map[string]*construct.Graph
-	stateTracker  *construct.StateTracker
+	mainGraph     *resourcegroup.Graph
+	stateGraphs   map[string]*resourcegroup.Graph
+	stateTracker  *resourcegroup.StateTracker
 	CreateProcess []*Process
 	// maybe UpdateProcess []*Process
 	DeleteProcess []*Process
@@ -74,7 +74,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
-	o.mainGraph.Claim = construct.Claim{Unstructured: claimUnstructured}
+	o.mainGraph.Claim = resourcegroup.Claim{Unstructured: claimUnstructured}
 
 	/* err = o.mainGraph.TopologicalSort()
 	if err != nil {
@@ -135,7 +135,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				}
 				fmt.Println("             => resource created")
 				fmt.Println("             => setting state to creating")
-				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateCreating)
+				o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateCreating)
 				// fmt.Println("             => requeueing")
 				// return requeue.NeededAfter(fmt.Errorf("resource created"), 5*time.Second)
 			} else {
@@ -144,7 +144,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		}
 		fmt.Println("             => resource found..")
 		if resource.IsStatusless() {
-			o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
+			o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateReady)
 		} else if observed != nil {
 			observedStatus, ok := observed.Object["status"]
 			fmt.Println("             => resource has status", ok)
@@ -153,7 +153,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				if err != nil {
 					return err
 				}
-				o.stateTracker.SetState(resource.RuntimeID, construct.ResourceStateReady)
+				o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateReady)
 
 				// o.mainGraph.PrintVariables()
 				err = o.mainGraph.ResolvedVariables()

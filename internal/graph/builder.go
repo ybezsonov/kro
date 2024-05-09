@@ -12,24 +12,24 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// This package is reponsible of parsing the Construct field spec and building the Resource Graph.
+// This package is reponsible of parsing the ResourceGroup field spec and building the Resource Graph.
 // It uses the spec.resources field to understand the relationships between resources.
 // One of the main challenges is that resources could be of any types, and the relationships between them
 // is described using CEL expressions.
 
-// The Construct node is root of the Resource Graph.
-// Other resources can easily consume any spec/metadata/labels/annotations from the Construct node.
-// The construct node is provided by the user, and it is not created by the controller.
+// The ResourceGroup node is root of the Resource Graph.
+// Other resources can easily consume any spec/metadata/labels/annotations from the ResourceGroup node.
+// The resourcegroup node is provided by the user, and it is not created by the controller.
 
-// Other resources are called "children" of the Construct node.
-// They can consume data from the Construct node, and they can also consume data from other children.
+// Other resources are called "children" of the ResourceGroup node.
+// They can consume data from the ResourceGroup node, and they can also consume data from other children.
 // There two situations where a child can consume data from another child:
 // 1. The child is consuming a spec field from another child.
 // 2. The child is consuming a status field another child.
 
 type Collection struct {
-	Construct *Resource
-	Resources []*Resource
+	ResourceGroup *Resource
+	Resources     []*Resource
 }
 
 func parseDataWithYQ(raw []byte, path string) (string, error) {
@@ -44,12 +44,12 @@ func (c *Collection) GetReplaceData() (map[string]string, error) {
 		for _, ref := range resource.References {
 			switch ref.Type {
 			case ReferenceTypeSpec, ReferenceTypeMetadata, ReferenceTypeAnnotation:
-				uniData, err := parseDataCELFake(c.Construct.Raw, ref.Name)
+				uniData, err := parseDataCELFake(c.ResourceGroup.Raw, ref.Name)
 				if err != nil {
 					return nil, err
 				}
 				fmt.Println("USING CEL", ref.Name)
-				fmt.Println("ON", string(c.Construct.Raw))
+				fmt.Println("ON", string(c.ResourceGroup.Raw))
 				fmt.Println("---")
 				replaceData[ref.Name] = uniData
 			case ReferenceTypeResource:
@@ -116,11 +116,11 @@ func (r *Resource) WithReplacedReferences(data map[string]string) *Resource {
 
 type Builder struct{}
 
-func (b *Builder) Build(rawConstruct runtime.RawExtension, constructResources []*v1alpha1.Resource) (*Collection, error) {
+func (b *Builder) Build(rawResourceGroup runtime.RawExtension, resourcegroupResources []*v1alpha1.Resource) (*Collection, error) {
 	// Start by walking through the resources and build a map of resources.
 	// This map will be used to quickly access a resource by its name.
-	resources := make([]*Resource, 0, len(constructResources))
-	for _, resource := range constructResources {
+	resources := make([]*Resource, 0, len(resourcegroupResources))
+	for _, resource := range resourcegroupResources {
 		var data map[string]interface{}
 		err := yaml.Unmarshal(resource.Definition.Raw, &data)
 		if err != nil {
@@ -153,7 +153,7 @@ func (b *Builder) Build(rawConstruct runtime.RawExtension, constructResources []
 				return nil, fmt.Errorf("couldn't build variable %s: %v", ref, err)
 			}
 			resource.References = append(resource.References, references)
-			// If the variable is targetting the Construct node, we don't need to do anything.
+			// If the variable is targetting the ResourceGroup node, we don't need to do anything.
 			if references.Type == ReferenceTypeResource {
 				targetResource, ok := references.getTargetResource(resources)
 				if !ok {
@@ -168,11 +168,11 @@ func (b *Builder) Build(rawConstruct runtime.RawExtension, constructResources []
 		}
 	}
 
-	// Now just unmarshal the construct data.
-	var constructData map[string]interface{}
-	err = yaml.Unmarshal(rawConstruct.Raw, &constructData)
+	// Now just unmarshal the resourcegroup data.
+	var resourcegroupData map[string]interface{}
+	err = yaml.Unmarshal(rawResourceGroup.Raw, &resourcegroupData)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't parse yaml data from construct %v", err)
+		return nil, fmt.Errorf("couldn't parse yaml data from resourcegroup %v", err)
 	}
 
 	// Validate that there is no cyclic dependencies.
@@ -185,9 +185,9 @@ func (b *Builder) Build(rawConstruct runtime.RawExtension, constructResources []
 
 	collection := &Collection{
 		Resources: resources,
-		Construct: &Resource{
+		ResourceGroup: &Resource{
 			Name:           "main",
-			Data:           constructData,
+			Data:           resourcegroupData,
 			ReferenceNames: []string{},
 			DependsOn:      []string{},
 			References:     []*Reference{},

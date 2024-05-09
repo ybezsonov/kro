@@ -1,4 +1,4 @@
-package construct
+package resourcegroup
 
 import (
 	"errors"
@@ -45,11 +45,11 @@ func (g *Graph) OrderedResourceList() []string {
 	return list
 }
 
-func NewGraph(constructResources []v1alpha1.Resource) (*Graph, error) {
+func NewGraph(resourcegroupResources []v1alpha1.Resource) (*Graph, error) {
 	// Start by walking through the resources and build a map of resources.
 	// This map will be used to quickly access a resource by its name.
-	resources := make([]*Resource, 0, len(constructResources))
-	for _, r := range constructResources {
+	resources := make([]*Resource, 0, len(resourcegroupResources))
+	for _, r := range resourcegroupResources {
 		resource, err := NewResourceFromRaw(r.Name, r.Definition.Raw)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't build resource: %s: %v", r.Name, err)

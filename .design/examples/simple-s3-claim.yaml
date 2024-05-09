@@ -1,6 +1,0 @@
-apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: SimpleS3
-metadata:
-  name: simple-s3-claim
-spec:
-  name: something-not-usefull2

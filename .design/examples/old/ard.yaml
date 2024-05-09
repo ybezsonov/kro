@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Construct
+kind: ResourceGroup
 metadata:
   name: irsas.x.symphony.k8s.aws
 spec:

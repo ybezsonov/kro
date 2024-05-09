@@ -1,4 +1,4 @@
-package construct
+package resourcegroup
 
 import (
 	"bytes"
@@ -26,7 +26,7 @@ type VariableKind string
 
 const (
 	VariableKindUnknown                 VariableKind = "VariableUnknown"
-	VariableKindClaimSpecRefrence       VariableKind = "VariableMainConstructRefrence"
+	VariableKindClaimSpecRefrence       VariableKind = "VariableMainResourceGroupRefrence"
 	VariableKindClaimStatusRefrence     VariableKind = "VariableClaimStatusRefrence"
 	VariableKindResourceSpecReference   VariableKind = "VariableResourceSpecReference"
 	VariableKindResourceStatusReference VariableKind = "VariableResourceStatusReference"

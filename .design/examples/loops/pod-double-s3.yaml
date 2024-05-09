@@ -1,5 +1,5 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Abstraction
+kind: ResourceGroup
 metadata:
   name: pods3.x.symphony.k8s.aws
 spec:
@@ -8,7 +8,6 @@ spec:
   definition:
     spec:
       bucketName: string
-      tags: '[]string'
   resources:
   - name: pod
     definition:

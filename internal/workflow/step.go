@@ -1,6 +1,6 @@
 package workflow
 
-import "github.com/aws/symphony/internal/construct"
+import "github.com/aws/symphony/internal/resourcegroup"
 
 type StepType string
 
@@ -22,5 +22,5 @@ type Step struct {
 	Type StepType
 	//
 	// Action is the action that this step is performing.
-	Action func(*construct.Graph) error
+	Action func(*resourcegroup.Graph) error
 }

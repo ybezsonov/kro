@@ -30,7 +30,7 @@ func eval() (*string, error) {
 		return nil, err
 	}
 
-	expr := `range(0, 10, 5).map(x, {"key"+string(x): x, "value"+string(x): x})`
+	expr := `range(10).map(x, {"key"+string(x): x, "value"+string(x): x})`
 	prog, err := env.Program(expr)
 	if err != nil {
 		return nil, err

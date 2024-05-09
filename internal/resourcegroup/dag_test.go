@@ -1,4 +1,4 @@
-package construct
+package resourcegroup
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	IRSAConstructSpec = `definition:
+	IRSAResourceGroupSpec = `definition:
   spec:
     awsAccountID: string
     eksOIDC: string

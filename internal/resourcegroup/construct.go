@@ -1,4 +1,4 @@
-package construct
+package resourcegroup
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -6,12 +6,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type Construct interface {
+type ResourceGroup interface {
 	Resources() []*ResourceBase
 	Graph() *Graph
 }
 
-type ConstructClaim ResourceBase
+type ResourceGroupClaim ResourceBase
 
 type ResourceBase interface {
 	Identifier() string

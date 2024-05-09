@@ -1,10 +1,10 @@
 package operator
 
-import "github.com/aws/symphony/internal/construct"
+import "github.com/aws/symphony/internal/resourcegroup"
 
 type _ interface {
-	EnsureConstructCRD() error
-	EnsureConstructResourceCRDs() error
+	EnsureResourceGroupCRD() error
+	EnsureResourceGroupResourceCRDs() error
 
 	RegistrerClaimController() error
 	DeregisterClaimController() error
@@ -12,5 +12,5 @@ type _ interface {
 
 type Operator struct {
 	Name string
-	CG   *construct.Graph
+	CG   *resourcegroup.Graph
 }
