@@ -1,0 +1,7 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: EKSCluster
+metadata:
+  name: eks-cluster-claim-abc
+spec:
+  name: symphony-abc
+  version: "1.29"

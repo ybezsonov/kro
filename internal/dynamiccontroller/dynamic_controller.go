@@ -101,9 +101,9 @@ func (cc *DynamicController) Run(ctx context.Context, workers int) {
 	logger.Info("Starting symphony dynamic controller", "name", cc.name)
 	defer logger.Info("Shutting symphony dynamic controller", "name", cc.name)
 
-	if !cache.WaitForNamedCacheSync(cc.name, ctx.Done(), cc.synced) {
+	/* if !cache.WaitForNamedCacheSync(cc.name, ctx.Done(), cc.synced) {
 		return
-	}
+	} */
 
 	for i := 0; i < workers; i++ {
 		go wait.UntilWithContext(ctx, cc.worker, time.Second)

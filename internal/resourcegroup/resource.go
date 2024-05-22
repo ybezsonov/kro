@@ -69,14 +69,17 @@ func (r *Resource) HasStatus() bool {
 // Some resources like ServiceAccount, ConfigMap, etc. don't have status
 // We need to hard code this for now.
 func (r *Resource) IsStatusless() bool {
+	group := r.Unstructured().GetAPIVersion()
 	kind := r.Unstructured().GetKind()
-	return kind == "ServiceAccount" ||
+	s := !strings.Contains(group, "services.k8s.aws") && (kind == "ServiceAccount" ||
 		kind == "ConfigMap" ||
 		kind == "Secret" ||
 		kind == "Role" ||
 		kind == "RoleBinding" ||
 		kind == "ClusterRole" ||
-		kind == "ClusterRoleBinding"
+		kind == "ClusterRoleBinding")
+	fmt.Println(".... is statusless", s, r.RuntimeID)
+	return s
 }
 
 func haveRef(refs []*ResourceRef, runtimeID string) bool {

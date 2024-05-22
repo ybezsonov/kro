@@ -5,17 +5,13 @@ metadata:
 spec:
   apiVersion: v1alpha1
   kind: IRSA
-  definition:
+  variables:
     spec:
       awsAccountID: string
       eksOIDC: string
       policyDocument: string
       serviceAccountName: string
       namespace: string
-    status:
-      serviceAccountName: ${}
-      roleName: ${}
-
   resources:
   - name: irsaPolicy
     definition:

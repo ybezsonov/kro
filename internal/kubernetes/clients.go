@@ -16,6 +16,7 @@ func NewDynamicClient() (*dynamic.DynamicClient, error) {
 	if err != nil {
 		return nil, err
 	}
+	config.UserAgent = "symphony.io v0.0.1"
 	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, err

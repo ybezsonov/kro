@@ -94,12 +94,12 @@ func NewGraph(resourcegroupResources []v1alpha1.Resource) (*Graph, error) {
 		}
 	}
 	// Validate that there are no cyclic dependencies.
-	for _, resource := range resources {
+	/* for _, resource := range resources {
 		err := detectCyclicDependencies(resource, resources, make(map[string]bool), resource.RuntimeID)
 		if err != nil {
 			return nil, err
 		}
-	}
+	} */
 
 	return &Graph{
 		Resources: resources,
@@ -244,7 +244,9 @@ func getVariableResourceRef(variable string, resources []*Resource) (*Resource, 
 // detectCyclicDependencies is a recursive function that detects cyclic dependencies between resources.
 func detectCyclicDependencies(resource *Resource, resources []*Resource, seen map[string]bool, path string) error {
 	seen[resource.RuntimeID] = true
+	fmt.Println("SEEN ", resource.RuntimeID)
 	for _, dependency := range resource.Dependencies {
+		fmt.Println("  DOING DEPENDENCY", dependency.RuntimeID)
 		if seen[dependency.RuntimeID] {
 			return fmt.Errorf("circular dependency detected: %s", path)
 		}
@@ -357,7 +359,7 @@ func (r *Resource) ApplyResolvedVariables() error {
 }
 
 func (g *Graph) TopologicalSort() error {
-	orderedResources, err := g.topologicalSort()
+	orderedResources, err := g.getCreationOrder()
 	if err != nil {
 		return err
 	}

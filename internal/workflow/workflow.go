@@ -37,20 +37,24 @@ func NewOperator(
 		log:          &log,
 		target:       target,
 		client:       client,
-		mainGraph:    g,
-		stateGraphs:  make(map[string]*resourcegroup.Graph),
+		graph:        g,
 		stateTracker: resourcegroup.NewStateTracker(g),
 	}
 }
 
+type objectCache struct {
+	graph        *resourcegroup.Graph
+	stateTracker *resourcegroup.StateTracker
+}
+
 type Operator struct {
 	// mu            sync.RWMutex
-	id            string
-	log           *logr.Logger
-	target        schema.GroupVersionResource
-	client        *dynamic.DynamicClient
-	mainGraph     *resourcegroup.Graph
-	stateGraphs   map[string]*resourcegroup.Graph
+	id     string
+	log    *logr.Logger
+	target schema.GroupVersionResource
+	client *dynamic.DynamicClient
+
+	graph         *resourcegroup.Graph
 	stateTracker  *resourcegroup.StateTracker
 	CreateProcess []*Process
 	// maybe UpdateProcess []*Process
@@ -74,22 +78,23 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
-	o.mainGraph.Claim = resourcegroup.Claim{Unstructured: claimUnstructured}
+	o.graph.Claim = resourcegroup.Claim{Unstructured: claimUnstructured}
 
 	/* err = o.mainGraph.TopologicalSort()
 	if err != nil {
 		return err
 	} */
-	err = o.mainGraph.ResolvedVariables()
+
+	err = o.graph.ResolvedVariables()
 	if err != nil {
 		return err
 	}
-	err = o.mainGraph.ReplaceVariables()
+	err = o.graph.ReplaceVariables()
 	if err != nil {
 		return err
 	}
 
-	if o.mainGraph.Claim.IsStatus("") {
+	if o.graph.Claim.IsStatus("") {
 		err = o.patchClaimStatus(ctx, "IN PROGRESS", []v1alpha1.Condition{})
 		if err != nil {
 			return err
@@ -99,17 +104,16 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 	o.stateTracker.String()
 
 	fmt.Println("     > starting graph execution")
-	for i := range o.mainGraph.Resources {
-		resource := o.mainGraph.Resources[i]
+	for i := range o.graph.Resources {
+		resource := o.graph.Resources[i]
 		fmt.Println("         > resource: ", resource.RuntimeID)
 		fmt.Println("             > current state: ", o.stateTracker.GetState(resource.RuntimeID))
 		fmt.Println("             > dependencies ready: ", o.stateTracker.ResourceDependenciesReady(resource.RuntimeID))
 		if !o.stateTracker.ResourceDependenciesReady(resource.RuntimeID) {
-			return requeue.NeededAfter(fmt.Errorf("resource dependencies not ready"), 5)
+			return requeue.NeededAfter(fmt.Errorf("resource dependencies not ready"), 10)
 		}
 
 		gvr := resource.GVR()
-
 		rUnstructured := resource.Unstructured()
 
 		rname := rUnstructured.GetName()
@@ -137,17 +141,18 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				fmt.Println("             => setting state to creating")
 				o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateCreating)
 				// fmt.Println("             => requeueing")
-				// return requeue.NeededAfter(fmt.Errorf("resource created"), 5*time.Second)
+				return requeue.NeededAfter(fmt.Errorf("resource created"), 1*time.Second)
 			} else {
 				return err
 			}
 		}
-		fmt.Println("             => resource found..")
+
+		// fmt.Println("             => resource found..")
 		if resource.IsStatusless() {
 			o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateReady)
 		} else if observed != nil {
 			observedStatus, ok := observed.Object["status"]
-			fmt.Println("             => resource has status", ok)
+			// fmt.Println("             => resource has status", ok)
 			if ok {
 				err := resource.SetStatus(observedStatus.(map[string]interface{}))
 				if err != nil {
@@ -156,16 +161,18 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 				o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateReady)
 
 				// o.mainGraph.PrintVariables()
-				err = o.mainGraph.ResolvedVariables()
+				err = o.graph.ResolvedVariables()
 				if err != nil {
 					return err
 				}
-				o.mainGraph.PrintVariables()
-				err = o.mainGraph.ReplaceVariables()
+				o.graph.PrintVariables()
+				err = o.graph.ReplaceVariables()
 				if err != nil {
 					return err
 				}
 				// fmt.Println("			 => raw data: ", resource.Data)
+			} else {
+				o.stateTracker.SetState(resource.RuntimeID, resourcegroup.ResourceStateCreating)
 			}
 
 			// fmt.Println("             => resource status set TO READY")
@@ -196,8 +203,8 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 }
 
 func (o *Operator) patchClaimStatus(ctx context.Context, state string, conditions []v1alpha1.Condition) error {
-	fmt.Println("patching claim status", o.target)
-	claim := o.mainGraph.Claim
+	//fmt.Println("patching claim status", o.target)
+	claim := o.graph.Claim
 
 	s := map[string]interface{}{
 		"state":      state,
@@ -207,13 +214,13 @@ func (o *Operator) patchClaimStatus(ctx context.Context, state string, condition
 	claim.Unstructured.Object["status"] = s
 	claimUnstructured := claim.Unstructured
 	client := o.client.Resource(o.target)
-	fmt.Println(claim.Object)
-	fmt.Println("GOING FOR IT", claimUnstructured.GetName())
+	//fmt.Println(claim.Object)
+	//fmt.Println("GOING FOR IT", claimUnstructured.GetName())
 	/* _, err := client.Namespace("default").Get(ctx, claimUnstructured.GetName(), metav1.GetOptions{})
 	if err != nil {
 		return err
 	} */
-	fmt.Println("GOT IT")
+	//fmt.Println("GOT IT")
 
 	b, _ := json.Marshal(claim.Unstructured)
 	_, err := client.Namespace("default").Patch(ctx, claimUnstructured.GetName(), types.MergePatchType, b, metav1.PatchOptions{})

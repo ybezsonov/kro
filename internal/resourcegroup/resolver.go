@@ -5,7 +5,7 @@ import (
 )
 
 type _ interface {
-	ResolveClain(expression string) (any, error)
+	ResolveClaim(expression string) (any, error)
 	ResolveResource(expression string) (any, error)
 }
 

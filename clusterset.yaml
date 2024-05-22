@@ -1,0 +1,32 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: ResourceGroup
+metadata:
+  name: clusterset.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: ClusterSet
+  definition:
+    spec:
+      name: string
+      version: string
+  resources:
+  - name: stage
+    definition:
+      apiVersion: x.symphony.k8s.aws/v1alpha1
+      kind: EKSCluster
+      metadata:
+        name: stage-${spec.name}
+      spec:
+        name: stage-${spec.name}
+        version: ${spec.version}
+        numNodes: "1"
+  - name: production
+    definition:
+      apiVersion: x.symphony.k8s.aws/v1alpha1
+      kind: EKSCluster
+      metadata:
+        name: production-${spec.name}
+      spec:
+        name: production-${spec.name}
+        version: ${spec.version}
+        numNodes: "1"

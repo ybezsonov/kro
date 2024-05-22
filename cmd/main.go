@@ -110,7 +110,7 @@ func main() {
 	crdManager := crd.Manager{Client: crdClient}
 
 	dc := dynamiccontroller.NewDynamicController(context.Background(), "dc-system", dynamicClient, nil)
-	go dc.Run(context.Background(), 10)
+	go dc.Run(context.Background(), 1)
 
 	if err = (&controller.ResourceGroupReconciler{
 		Client:            mgr.GetClient(),
