@@ -28,6 +28,7 @@ spec:
           - name: SECONDARY_BUCKET_LOCATION
             value: ${bucketSecondary.status.location}
   - name: bucketPrimary
+    readyOn: ${bucketSecondary.status.conditions.filter(Synced, true)}
     definition:
       apiVersion: s3.services.k8s.aws/v1alpha1
       kind: Bucket

@@ -3,16 +3,13 @@ kind: ResourceGroup
 metadata:
   name: ekscluster.x.symphony.k8s.aws
 spec:
-  apiVersion: v1alpha1
+
   kind: EKSCluster
-  definition: # NeoCRD, open simple schema
+  definition: # NeoCRD / Open Simple Schema
     spec:
       name: string
       version: string
-      config:
-        name: string
-        subconfig:
-          number: int
+
   resources:
   - name: securityGroup
     definition:
@@ -29,12 +26,9 @@ spec:
       apiVersion: ec2.services.k8s.aws/v1alpha1
       kind: VPC
       metadata:
-        name: cluster-vpc-${spec.name}
-      spec:
-        enableDNSSupport: true
-        enableDNSHostnames: true
-        cidrBlocks:
-        - "192.168.0.0/16"
+        annotations:
+          services.k8s.aws/read-only: "true"
+          services.k8s.aws/adopt-or-create: "true"
   - name: subnetAZA
     definition:
       apiVersion: ec2.services.k8s.aws/v1alpha1
@@ -44,7 +38,7 @@ spec:
       spec:
         availabilityZone: us-west-2a
         cidrBlock: 192.168.0.0/18
-        vpcID: ${clusterVPC.status.vpcID}
+        vpcID: ${clusterVPC.status.vpcID123}
   - name: subnetAZB
     definition:
       apiVersion: ec2.services.k8s.aws/v1alpha1

@@ -5,12 +5,11 @@ import "github.com/aws/symphony/internal/resourcegroup"
 type StepType string
 
 const (
-	StepTypeKubernetesCreate StepType = "KubernetesCreate"
-	StepTypeKubernetesUpdate StepType = "KubernetesUpdate"
-	StepTypeKubernetesDelete StepType = "KubernetesDelete"
-	StepTypeKubernetesRead   StepType = "KubernetesRead"
-	StepTypeKubernetesDelta  StepType = "KubernetesDelta"
-	StepTypeResourceReplace  StepType = "ResourceReplace"
+	StepTypeRead    StepType = "Read"
+	StepTypeCreate  StepType = "Create"
+	StepTypeUpdate  StepType = "Update"
+	StepTypeDelete  StepType = "Delete"
+	StepTypeCompare StepType = "Compare"
 )
 
 type Step struct {

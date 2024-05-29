@@ -94,7 +94,7 @@ func (o *Operator) Handler(ctx context.Context, req ctrl.Request) error {
 		return err
 	}
 
-	if o.graph.Claim.IsStatus("") {
+	if o.graph.Claim.HasState("") {
 		err = o.patchClaimStatus(ctx, "IN PROGRESS", []v1alpha1.Condition{})
 		if err != nil {
 			return err
