@@ -21,26 +21,33 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // ResourceGroupSpec defines the desired state of ResourceGroup
 type ResourceGroupSpec struct {
 	// +kubebuilder:validation:Required
 	Kind string `json:"kind,omitempty"`
 	// +kubebuilder:validation:Required
-	ApiVersion string `json:"apiVersion,omitempty"`
+	// APIVersion is the kubernetes API version of the resourcegroup.
+	//
+	// Ideally the user shouldn't have to provide this field.. But rather
+	// symphony needs to compute the mutation deltas, manage API versions
+	// and provide a default API version.
+	APIVersion string `json:"apiVersion,omitempty"`
 	// +kubebuilder:validation:Required
-	Definition *Definition `json:"definition,omitempty"`
-	Resources  []*Resource `json:"resources,omitempty"`
+	// Schema is the schema of the CRD mapping to a resource group.
+	Schema *Schema `json:"schema,omitempty"`
+	// +kubebuilder:validation:Required
+	//
+	// Resources is the list of resources representing the resourcegroup.
+	Resources []*Resource `json:"resources,omitempty"`
 }
 
-type Definition struct {
+type Schema struct {
 	// +kubebuilder:validation:Required
 	Spec runtime.RawExtension `json:"spec,omitempty"`
 	// +kubebuilder:validation:Required
-	Status   runtime.RawExtension `json:"status,omitempty"`
-	Required []string             `json:"required,omitempty"`
+	Status runtime.RawExtension `json:"status,omitempty"`
+	//
+	Required []string `json:"required,omitempty"`
 }
 
 type Resource struct {
@@ -57,7 +64,7 @@ type ResourceGroupStatus struct {
 	// GraphState is the state of the resourcegroup graph
 	GraphState string `json:"graphState,omitempty"`
 	// TopologicalOrder is the topological order of the resourcegroup graph
-	TopoligicalOrder []string `json:"topologicalOrder,omitempty"`
+	TopologicalOrder []string `json:"topologicalOrder,omitempty"`
 	// Conditions represent the latest available observations of an object's state
 	Conditions []Condition `json:"conditions,omitempty"`
 }

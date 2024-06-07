@@ -7,13 +7,11 @@ spec:
   kind: ClusterSet
   variables:
     spec:
+      name: string
       version: string
-      clusterCount: int
   resources:
   - name: cluster
-    type: map
-    range: ${spec.numClusters}
-    templateDefinition:
+    definition:
       apiVersion: ekscluster.x.symphony.k8s.aws
       kind: EKSCluster
       metadata:

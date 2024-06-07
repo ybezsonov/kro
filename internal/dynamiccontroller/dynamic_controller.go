@@ -9,10 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/symphony/api/v1alpha1"
-	"github.com/aws/symphony/internal/requeue"
-	"github.com/aws/symphony/internal/resourcegroup"
-	"github.com/aws/symphony/internal/workflow"
 	"github.com/go-logr/logr"
 	"golang.org/x/time/rate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +24,18 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/aws/symphony/api/v1alpha1"
+	"github.com/aws/symphony/internal/requeue"
+	"github.com/aws/symphony/internal/resourcegroup"
+	"github.com/aws/symphony/internal/workflow"
 )
 
+// DynamicController is a controller that is responsible of watching for
+// specific CRD in the Kubernetes cluster and triggers the appropriate workflows
+// for them.
+// It can be re-configured during runtime without interrupting or blocking any
+// channels.
 type DynamicController struct {
 	// name is an identifier for this particular controller instance. Useless but I like naming things.
 	name string
@@ -71,7 +77,6 @@ func NewDynamicController(
 	handler func(context.Context, ctrl.Request) error,
 ) *DynamicController {
 	logger := log.FromContext(ctx)
-	// wo := workflow.NewOperator(schema.GroupVersionResource{}, nil, nil)
 
 	dc := &DynamicController{
 		name:       name,
@@ -88,6 +93,11 @@ func NewDynamicController(
 		mu:                sync.RWMutex{},
 		listers:           map[schema.GroupVersionResource]dynamiclister.Lister{},
 		workflowOperators: map[schema.GroupVersionResource]*workflow.Operator{},
+		synced: func() bool {
+			// Need some sort of merge all the sync functions together. Channels? maybe too complex
+			// i'll sleep on this one.
+			return true
+		},
 	}
 	return dc
 }

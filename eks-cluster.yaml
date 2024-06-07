@@ -5,7 +5,7 @@ metadata:
 spec:
 
   kind: EKSCluster
-  definition: # NeoCRD / Open Simple Schema
+  definition:
     spec:
       name: string
       version: string

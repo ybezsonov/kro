@@ -89,7 +89,7 @@ func (t *OpenAPISchemaTransformer) buildSchema(objectMap map[string]interface{},
 				return err
 			}
 		case []interface{}:
-			// we have an array
+			// we have an array. Ideally we want to more digging ...
 			properties := extv1.JSONSchemaProps{
 				Type: "array",
 				Items: &extv1.JSONSchemaPropsOrArray{

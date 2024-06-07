@@ -10,6 +10,8 @@ spec:
       name: string
       version: string
       numNodes: string
+      nodeGroup:
+        instanceType: string
     status:
       clusterARN: ${cluster.status.ackMetadata.ARN}
   resources:
@@ -49,54 +51,14 @@ spec:
         availabilityZone: us-west-2b
         cidrBlock: 192.168.64.0/18
         vpcID: ${clusterVPC.status.id}
-  - name: clusterRole
-    definition:
-      apiVersion: iam.services.k8s.aws/v1alpha1
-      kind: Role
-      metadata:
-        name: cluster-role
-      spec:
-        name: cluster-role
-        policies:
-        - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
-        assumeRolePolicyDocument: |
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Service": "eks.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
-              }
-            ]
-          }
   - name: nodeRole
     definition:
-      apiVersion: iam.services.k8s.aws/v1alpha1
-      kind: Role
+      apiVersion: noderole.x.symphony.k8s.aws
+      kind: NodeRole
       metadata:
-        name: cluster-node-role
+        name: noderole
       spec:
-        name: cluster-node-role
-        policies:
-        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
-        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
-        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-        assumeRolePolicyDocument: |
-          {
-            "Version": "2012-10-17",
-            "Statement": [
-              {
-                "Effect": "Allow",
-                "Principal": {
-                  "Service": "ec2.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
-              }
-            ]
-          }
+        name: noderole
   - name: cluster
     definition:
       apiVersion: eks.services.k8s.aws/v1alpha1
@@ -105,7 +67,7 @@ spec:
         name: ack-cluster
       spec:
         name: ack-cluster
-        roleARN: ${clusterRole.status.ackResourceMetadata.arn}
+        roleARN: ${spec.clusterRole}
         resourcesVPCConfig:
           endpointPrivateAccess: true
           endpointPublicAccess: true
@@ -132,7 +94,8 @@ spec:
         subnets:
           - ${subnetAZA.status.id}
           - ${subnetAZB.status.id}
-        nodeRole: ${nodeRole.status.ackResourceMetadata.arn}
+        nodeRole: ${nodeRole.status.nodeRoleARN}
+        instanceTypes: "${!spec.nodeGroup.instanceType ? ['t3.medium'] : [spec.nodeGroup.instanceType]}"
         updateConfig:
           maxUnavailable: 1
         scalingConfig:
