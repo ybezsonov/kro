@@ -8,7 +8,6 @@ spec:
   definition:
     spec:
       bucketName: string
-
   resources:
   - name: pod
     definition:
@@ -27,7 +26,6 @@ spec:
           env:
           - name: SECONDARY_BUCKET_LOCATION
             value: ${bucketSecondary.status.location}
-
   - name: bucketPrimary
     definition:
       apiVersion: s3.services.k8s.aws/v1alpha1
@@ -36,7 +34,6 @@ spec:
         name: ${spec.bucketName}
       spec:
         name: ${spec.bucketName}
-
   - name: bucketSecondary
     definition:
       apiVersion: s3.services.k8s.aws/v1alpha1

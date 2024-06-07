@@ -40,7 +40,7 @@ type ResourceGroupReconciler struct {
 	client.Client
 	Scheme            *runtime.Scheme
 	CRDManager        crd.Manager
-	NeoCRD            *openapischema.OpenAPISchemaTransformer
+	OpenAPISchema     *openapischema.OpenAPISchemaTransformer
 	DynamicController *dynamiccontroller.DynamicController
 }
 
@@ -69,16 +69,30 @@ func (r *ResourceGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	log.Info("Got resourcegroup from the api server", "name", req.NamespacedName)
 
-	log.Info("Transforming resourcegroup schema definition into an OpenAPIv3 schema", "name", req.NamespacedName)
+	log.Info("Transforming resourcegroup definition to OpenAPIv3 schema", "name", req.NamespacedName)
 
 	// Handle creation
-	crSchema, err := r.NeoCRD.Transform(resourcegroup.Spec.Schema.Spec.Raw, resourcegroup.Spec.Schema.Status.Raw)
+	oaSchema, err := r.OpenAPISchema.Transform(resourcegroup.Spec.Definition.Spec.Raw, resourcegroup.Spec.Definition.Status.Raw)
 	if err != nil {
 		log.Info("unable to transform OpenAPI schema")
 		return ctrl.Result{}, err
 	}
 
-	customRD := crd.FromOpenAPIV3Schema(resourcegroup.Spec.APIVersion, resourcegroup.Spec.Kind, crSchema)
+	/* 	yamlSchema, err := yaml.Marshal(oaSchema)
+	   	if err != nil {
+	   		log.Info("unable to marshal OpenAPI schema")
+	   		return ctrl.Result{}, err
+	   	}
+	   	fmt.Println(string(yamlSchema)) */
+
+	customRD := crd.FromOpenAPIV3Schema(resourcegroup.Spec.ApiVersion, resourcegroup.Spec.Kind, oaSchema)
+
+	/* 	bb, err := yaml.Marshal(customRD)
+	   	if err != nil {
+	   		log.Info("unable to marshal OpenAPI schema")
+	   		return ctrl.Result{}, err
+	   	}
+	   	fmt.Println(string(bb)) */
 
 	log.Info("Creating custom resource definition", "crd_name", customRD.Name)
 	err = r.CRDManager.Ensure(ctx, customRD)
@@ -101,13 +115,10 @@ func (r *ResourceGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 			log.Info("unable to delete CRD")
 			return ctrl.Result{}, err
 		}
-
 		log.Info("Unregistering GVK in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
 		r.DynamicController.UnregisterGVK(gvr)
-
 		log.Info("Unregistering workflow operator in symphony's dynamic controller", "crd_name", customRD.Name, "gvr", gvr)
 		r.DynamicController.UnregisterWorkflowOperator(gvr)
-
 		log.Info("Removing finalizer from resourcegroup", "crd_name", customRD.Name, "gvr", gvr)
 		err = r.setUnmanaged(ctx, &resourcegroup)
 		if err != nil {
@@ -177,7 +188,7 @@ func (r *ResourceGroupReconciler) setStatusActive(
 ) error {
 	dc := resourcegroup.DeepCopy()
 	dc.Status.State = "ACTIVE"
-	dc.Status.TopologicalOrder = orderedResources
+	dc.Status.TopoligicalOrder = orderedResources
 	conditions := dc.Status.Conditions
 	newConditions := condition.SetCondition(conditions,
 		condition.NewReconcilerReadyCondition(

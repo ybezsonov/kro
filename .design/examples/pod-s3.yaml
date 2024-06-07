@@ -1,23 +1,21 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: ResourceGroup
+kind: Abstraction
 metadata:
   name: pods3.x.symphony.k8s.aws
 spec:
+  apiVersion: v1alpha1
   kind: PodS3
-  variables: # CRD Definition
+  definition:
     spec:
       podName: string
       bucketName: string
-    status:
-      bucketLocation: ${bucketPrimary.status.location}
-      podReady: ${pod.conditions.exists(c, c.Ready == true)}
-  resources: # Resources and their relationship
+  resources:
   - name: pod
     definition:
       apiVersion: v1
       kind: Pod
       metadata:
-        name: ${spec.podName}
+        name: my-pod-with-s3
       spec:
         containers:
         - name: pod
@@ -30,6 +28,7 @@ spec:
           - name: SECONDARY_BUCKET_LOCATION
             value: ${bucketSecondary.status.location}
   - name: bucketPrimary
+    readyOn: ${bucketSecondary.status.conditions.filter(Synced, true)}
     definition:
       apiVersion: s3.services.k8s.aws/v1alpha1
       kind: Bucket
@@ -37,12 +36,11 @@ spec:
         name: ${spec.bucketName}
       spec:
         name: ${spec.bucketName}
-
-
-
-
-
-
-
-
-
+  - name: bucketSecondary
+    definition:
+      apiVersion: s3.services.k8s.aws/v1alpha1
+      kind: Bucket
+      metadata:
+        name: ${spec.bucketName}-secondary
+      spec:
+        name: ${spec.bucketName}-secondary

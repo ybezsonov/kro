@@ -116,7 +116,7 @@ func main() {
 		Client:            mgr.GetClient(),
 		Scheme:            mgr.GetScheme(),
 		CRDManager:        crdManager,
-		NeoCRD:            &schema.OpenAPISchemaTransformer{},
+		OpenAPISchema:     &schema.OpenAPISchemaTransformer{},
 		DynamicController: dc,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ResourceGroup")

@@ -1,0 +1,7 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: ClusterSet
+metadata:
+  name: cluster-set
+spec:
+  name: clusterset-symphony-2
+  version: "1.29"

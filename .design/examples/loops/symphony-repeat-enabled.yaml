@@ -87,10 +87,9 @@ spec:
           subnet: ${subnet.status.ID}
 
 
-
-
+    # starlark
     - name: subnetCollection
-      range: range(start=1, stop=10, step=2)
+      range: range(1, 10, 2)
       indexVariable: i # Symphony will create a variable called i that will be incremented for each iteration.
       generatedName: publicSubnet${i} # The generated name for each public subnet.
       templateDefinition:
@@ -102,7 +101,13 @@ spec:
           annotations: ${ackAnnotations}
           name: public-subnet-${i} # The name of each public subnet.
         spec:
+          vpcID: ${vpc.status.ACKResourceMetadata.ARN}
+          cidrBlock: ${spec.subnet.publicSubnet${i}.cidrBlock}
           availabilityZone: ${spec.subnet.publicSubnet${i}.availabilityZone}
+          ipv6CIDRBlock: ${spec.subnet.publicSubnet${i}.ipv6CIDRBlock}
+          routeTables:
+          - ${publicRouteTable.status.ID}
+          tags: ${outputTags}
 
 
 
@@ -110,42 +115,36 @@ spec:
 
 
 
-    - name: subnetCollection
-      repeat: ${spec.numberSubnets}
+    - name: privateSubnetCollection
+      repeat: 3
       indexVariable: i
       generatedName: privateSubnet${i}
-      templateDefinition:
+      definition:
         apiVersion: ec2.services.k8s.aws/v1alpha1
         kind: Subnet
         metadata:
           labels:
             zone: ${spec.subnet.privateSubnet${i}.availabilityZone}
+          annotations: ${ackAnnotations}
           name: private-subnet-${i}
         spec:
+          vpcID: ${vpc.status.ACKResourceMetadata.ARN}
+          cidrBlock: ${spec.subnet.privateSubnet${i}.cidrBlock}
           availabilityZone: ${spec.subnet.privateSubnet${i}.availabilityZone}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+          ipv6CIDRBlock: ${spec.subnet.privateSubnet${i}.ipv6CIDRBlock}
+          routeTables:
+          - ${privateRouteTable.status.ID}
+          tags:
+            - key: Name
+              value: private-subnet-${i}-${spec.vpc.name}
+            - key: kubernetes.io/role/internal-elb
+              value: "1"
     - name: internetGateway
       definition:
         apiVersion: ec2.services.k8s.aws/v1alpha1
         kind: InternetGateway
         metadata:
-          annotations: ${subnetCollections}
+          annotations: ${ackAnnotations}
         spec:
           vpcID: ${vpc.status.ACKResourceMetadata.ARN}
           tags:
