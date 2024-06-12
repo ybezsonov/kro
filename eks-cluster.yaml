@@ -3,13 +3,17 @@ kind: ResourceGroup
 metadata:
   name: ekscluster.x.symphony.k8s.aws
 spec:
-
+  apiVersion: v1alpha1
   kind: EKSCluster
-  definition: # NeoCRD / Open Simple Schema
+  definition:
     spec:
       name: string
       version: string
-
+    validations:
+    - expression: version < 1.30
+      message: "Version must be greater than 1.30"
+    - expression: new.version != old.version
+      message: "You cant upgrade the EKS Cluster version"
   resources:
   - name: securityGroup
     definition:
@@ -26,9 +30,12 @@ spec:
       apiVersion: ec2.services.k8s.aws/v1alpha1
       kind: VPC
       metadata:
-        annotations:
-          services.k8s.aws/read-only: "true"
-          services.k8s.aws/adopt-or-create: "true"
+        name: cluster-vpc-${spec.name}
+      spec:
+        enableDNSSupport: true
+        enableDNSHostnames: true
+        cidrBlocks:
+        - "192.168.0.0/16"
   - name: subnetAZA
     definition:
       apiVersion: ec2.services.k8s.aws/v1alpha1
@@ -38,7 +45,7 @@ spec:
       spec:
         availabilityZone: us-west-2a
         cidrBlock: 192.168.0.0/18
-        vpcID: ${clusterVPC.status.vpcID123}
+        vpcID: ${clusterVPC.status.vpcID}
   - name: subnetAZB
     definition:
       apiVersion: ec2.services.k8s.aws/v1alpha1
@@ -98,6 +105,7 @@ spec:
             ]
           }
   - name: cluster
+    readyOn: ${status.condtion.exist(Ready, true)}
     definition:
       apiVersion: eks.services.k8s.aws/v1alpha1
       kind: Cluster
@@ -120,7 +128,7 @@ spec:
         name: cluster-nodegroup-${spec.name}
       spec:
         name: test-nodegroup-${spec.name}
-        clusterName: ${cluster.spec.name}
+        clusterName: ${sha256(cluster.spec.name)}
         diskSize: 100
         subnets:
           - ${subnetAZA.status.subnetID}

@@ -1,0 +1,56 @@
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: ResourceGroup
+metadata:
+  name: atomic.x.symphony.k8s.aws
+spec:
+  kind: Atomic # Assume a dummy atomic type
+  apiVersion: v1alpha1
+  definition: {}
+  resources: []
+---
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: ResourceGroup # Building a collection of atomic types (making a vector)
+metadata:
+  name: vector.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: Vector
+  definition:
+    spec:
+      dimension: int
+  resources:
+  - name: vector-elements
+    collection:
+      index: ${range(0, spec.dimension)}
+      definition:
+        apiVersion: v1alpha1
+        kind: Atomic
+        metadata:
+          name: vector-atomic-element-${spec.index}
+        spec: {}
+---
+apiVersion: x.symphony.k8s.aws/v1alpha1
+kind: ResourceGroup # Building a collection of vectors (making a matrix)
+metadata:
+  name: matrix.x.symphony.k8s.aws
+spec:
+  apiVersion: v1alpha1
+  kind: Matrix
+  definition:
+    spec:
+      dimension:
+        x: int
+        y: int
+  resources:
+  - name: matrix-columns
+    collection:
+      index: ${range(0, spec.dimension.x)}
+      definition:
+        apiVersion: v1alpha1
+        kind: Vector
+        metadata:
+          name: vector-element-${spec.index}
+        spec:
+          dimension: ${spec.dimension.y}
+
+

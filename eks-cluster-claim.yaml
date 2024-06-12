@@ -1,7 +1,7 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
 kind: EKSCluster
 metadata:
-  name: eks-cluster-claim
+  name: test-cluster-2
 spec:
-  name: symphony
+  name: my-cluster-567
   version: "1.29"

@@ -1,14 +1,18 @@
 apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: Abstraction
+kind: ResourceGroup
 metadata:
   name: pods3.x.symphony.k8s.aws
 spec:
   apiVersion: v1alpha1
   kind: PodS3
-  definition:
+
+  definition: # CRD
     spec:
       podName: string
       bucketName: string
+    status:
+      location: ${bucketPrimary.status.location}
+
   resources:
   - name: pod
     definition:
