@@ -1,8 +1,0 @@
-apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: EKSCluster
-metadata:
-  name: mycluster
-spec:
-  clustername: mycluster
-  region:
-  numberNodes:

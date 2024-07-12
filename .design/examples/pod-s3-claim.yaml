@@ -1,6 +1,0 @@
-apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: PodS3
-metadata:
-  name: pod-s3-claim
-spec:
-  bucketName: main-ack-symphony-bucket-12345

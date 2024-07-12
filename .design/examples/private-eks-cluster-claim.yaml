@@ -1,9 +1,0 @@
-apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: PrivateEKSCluster
-metadata:
-  name: private-eks-cluster-claim
-  namespace: symphony-production
-spec:
-  name: symphony-production-cluster
-  version: "1.28"
-  numNodes: "1"

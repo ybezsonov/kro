@@ -1,6 +1,0 @@
-apiVersion: x.symphony.k8s.aws/v1alpha1
-kind: SecureBucket
-metadata:
-  name: secure-bucket
-spec:
-  name: mybucketname

@@ -1,7 +1,0 @@
-apiVersion: clusterset.x.symphony.k8s.aws
-kind: ClusterSet
-metadata:
-  name: clusterset.x.symphony.k8s.aws
-spec:
-  version: "1.30"
-  clusterCount: 10
