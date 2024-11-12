@@ -22,7 +22,7 @@ kro is Kubernetes native and integrates seamlessly with existing tools to preser
 | [Getting started][kro-getting-started] | Deploy your first ResourceGroup |
 | [Concepts][kro-concepts]               | Learn more about kro concepts   |
 | [Examples][kro-examples]               | Example resources               |
-| [Contributions][CONTRIBUTING.md]       | How to get involved             |
+| [Contributions](./CONTRIBUTING.md)       | How to get involved             |
 
 [kro-overview]: https://kro.run/docs/overview
 [kro-installation]: https://kro.run/docs/getting-started/Installation
