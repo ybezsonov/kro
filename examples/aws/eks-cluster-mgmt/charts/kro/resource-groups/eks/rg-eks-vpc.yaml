@@ -50,6 +50,8 @@ spec:
 
       addons:
 
+        enable_ingress_class_alb: string | default="true"
+        enable_argo_rollouts: string | default="true"
         enable_metrics_server: string | default="false"
         enable_external_secrets: string | default="true"
         enable_external_dns: string | default="false"
@@ -89,8 +91,6 @@ spec:
 
   resources:
   - id: vpc
-    readyWhen:
-    - ${vpc.status.conditions.exists(x, x.type == 'InstanceSynced' && x.status == "True")} # Check on kro conditions
     template:
       apiVersion: kro.run/v1alpha1
       kind: Vpc
@@ -162,6 +162,8 @@ spec:
             workloadRepoRevision: ${schema.spec.gitops.workloadRepoRevision}
             workloadRepoUrl: ${schema.spec.gitops.workloadRepoUrl}
           addons:
+            enable_ingress_class_alb: ${schema.spec.addons.enable_ingress_class_alb}
+            enable_argo_rollouts: ${schema.spec.addons.enable_argo_rollouts}
             enable_metrics_server: ${schema.spec.addons.enable_metrics_server}
             enable_external_secrets: ${schema.spec.addons.enable_external_secrets}
             enable_external_dns: ${schema.spec.addons.enable_external_dns}

@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-rollout-kargo
+  namespace: argocd
+spec:
+  destination:
+    name: hub-cluster
+    namespace: demo-kargo-rollout
+  project: default
+  source:
+    path: ./kargo
+    repoURL: https://github.com/ybezsonov/kro/workshop-user/demo-rollout-deploy.git
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

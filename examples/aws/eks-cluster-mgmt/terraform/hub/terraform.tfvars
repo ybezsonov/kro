@@ -3,7 +3,8 @@ kubernetes_version              = "1.32"
 cluster_name                    = "hub-cluster"
 tenant                          = "tenant1"
 
-git_org_name                    = "XXXXXXXX" # update this if you want to customize the gitops configurations
+git_url                         = "https://github.com/ybezsonov/kro/"
+git_org_name                    = "workshop-user"
 
 gitops_addons_repo_name         = "eks-cluster-mgmt"
 gitops_addons_repo_base_path    = "addons/"
@@ -27,4 +28,4 @@ gitops_workload_repo_revision   = "main"
 
 
 # AWS Accounts used for demo purposes (cluster1 cluster2)
-account_ids = "012345678910 123456789101" # update this with your spoke aws accounts ids
+account_ids = "MANAGEMENT_ACCOUNT_ID" # update this with your spoke aws accounts ids

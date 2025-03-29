@@ -25,14 +25,18 @@ variable "addons" {
   description = "Kubernetes addons"
   type        = any
   default     = {
+    enable_ingress_class_alb            = true
+    enable_argo_rollouts                = true
+    enable_kyverno_policies             = true
     enable_metrics_server               = true
     enable_kyverno                      = true
     enable_kyverno_policies             = true
     enable_kyverno_policy_reporter      = true
     enable_argocd                       = true
+    enable_kargo                        = true
     enable_cni_metrics_helper           = false
     enable_kube_state_metrics           = true
-    enable_cert_manager                 = false
+    enable_cert_manager                 = true
     enable_external_dns                 = false
     enable_external_secrets             = true
     enable_ack_iam                      = true
@@ -62,6 +66,11 @@ variable "route53_zone_name" {
   default     = ""
 }
 # Github Repos Variables
+
+variable "git_url" {
+  description = "The Url of Git server"
+  default     = "https://github.com/"
+}
 
 variable "git_org_name" {
   description = "The name of Github organisation"

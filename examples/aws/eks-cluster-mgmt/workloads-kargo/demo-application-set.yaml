@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: demo-rollout
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/ybezsonov/kro/workshop-user/demo-rollout-deploy.git
+        revision: HEAD
+        directories:
+          - path: env/*
+  template:
+    metadata:
+      name: 'demo-rollout-{{path.basename}}'
+      annotations:
+        kargo.akuity.io/authorized-stage: 'demo-rollout-kargo:{{path.basename}}'
+    spec:
+      project: default
+      destination:
+        name: 'cluster-{{path.basename}}'
+        namespace: 'demo-rollout'
+      source:
+        path: './'
+        repoURL: https://github.com/ybezsonov/kro/workshop-user/demo-rollout-deploy.git
+        targetRevision: 'env/{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true

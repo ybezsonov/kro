@@ -12,11 +12,11 @@ locals {
   region                    = data.aws_region.current.id
   cluster_version           = var.kubernetes_version
   argocd_namespace          = "argocd"
-  gitops_addons_repo_url    = "https://github.com/${var.git_org_name}/${var.gitops_addons_repo_name}.git"
-  gitops_fleet_repo_url     = "https://github.com/${var.git_org_name}/${var.gitops_fleet_repo_name}.git"
-  gitops_workload_repo_url = "https://github.com/${var.git_org_name}/${var.gitops_workload_repo_name}.git"
+  gitops_addons_repo_url    = "${var.git_url}${var.git_org_name}/${var.gitops_addons_repo_name}.git"
+  gitops_fleet_repo_url     = "${var.git_url}${var.git_org_name}/${var.gitops_fleet_repo_name}.git"
+  gitops_workload_repo_url = "${var.git_url}${var.git_org_name}/${var.gitops_workload_repo_name}.git"
 
-  gitops_platform_repo_url = "https://github.com/${var.git_org_name}/${var.gitops_platform_repo_name}.git"
+  gitops_platform_repo_url = "${var.git_url}${var.git_org_name}/${var.gitops_platform_repo_name}.git"
 
   external_secrets = {
     namespace       = "external-secrets"
@@ -84,10 +84,12 @@ locals {
     enable_kro                                   = try(var.addons.enable_kro, false)
     enable_kro_eks_rgs                           = try(var.addons.enable_kro_eks_rgs, false)
     enable_mutli_acct                            = try(var.addons.enable_mutli_acct, false)
+    enable_ingress_class_alb                     = try(var.addons.enable_ingress_class_alb, false)
 
   }
   oss_addons = {
     enable_argocd                          = try(var.addons.enable_argocd, false)
+    enable_kargo                           = try(var.addons.enable_kargo, false)
     enable_argo_rollouts                   = try(var.addons.enable_argo_rollouts, false)
     enable_argo_events                     = try(var.addons.enable_argo_events, false)
     enable_argo_workflows                  = try(var.addons.enable_argo_workflows, false)

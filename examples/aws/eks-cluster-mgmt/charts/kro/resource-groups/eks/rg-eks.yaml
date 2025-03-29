@@ -53,6 +53,8 @@ spec:
         workloadRepoUrl: string
       addons:
 
+        enable_ingress_class_alb: string
+        enable_argo_rollouts: string
         enable_metrics_server: string
         enable_external_secrets: string
         enable_external_dns: string
@@ -279,6 +281,8 @@ spec:
             workloads: "${schema.spec.workloads}"
             #using : useSelector: true for centralized mode
 
+            enable_ingress_class_alb: "${schema.spec.addons.enable_ingress_class_alb}"
+            enable_argo_rollouts: "${schema.spec.addons.enable_argo_rollouts}"
             enable_metrics_server: "${schema.spec.addons.enable_metrics_server}"
             enable_external_secrets: "${schema.spec.addons.enable_external_secrets}"
             enable_external_dns: "${schema.spec.addons.enable_external_dns}"
