@@ -3,8 +3,8 @@ kubernetes_version              = "1.32"
 cluster_name                    = "hub-cluster"
 tenant                          = "tenant1"
 
-git_url                         = "https://github.com/ybezsonov/kro/"
-git_org_name                    = "workshop-user"
+git_url                         = "GIT_CLUSTER_MGMT_URL"
+git_org_name                    = "GIT_ORG_NAME"
 
 gitops_addons_repo_name         = "eks-cluster-mgmt"
 gitops_addons_repo_base_path    = "addons/"
