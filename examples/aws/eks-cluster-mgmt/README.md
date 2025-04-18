@@ -574,15 +574,6 @@ kubectl -n kargo rollout restart deploy kargo-controller
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh orange
 ```
 
-5. Install Argo Rollouts plugin:
-
-```sh
-curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-chmod +x ./kubectl-argo-rollouts-linux-amd64
-sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
-kubectl argo rollouts version
-```
-
 ### Promote the application to prod clusters
 
 1. Login to Kargo UI and `Promote` active Freight to `prod-eu` and `prod-us`.
