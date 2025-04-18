@@ -185,9 +185,35 @@ stringData:
 EOF
 ```
 
-7. Login to Argo CD UI and Sync `bootstrap` Argo CD application.
+7. Login to Argo CD UI and Refresh `bootstrap` Argo CD application.
 
 > Wait until all Argo CD applications will be deployed successfully.
+
+```sh
+kubectl get applications -n argocd
+```
+
+```sh
+NAME                            SYNC STATUS   HEALTH STATUS
+ack-ec2-hub-cluster             Synced        Healthy
+ack-eks-hub-cluster             Synced        Healthy
+ack-iam-hub-cluster             Synced        Healthy
+argo-rollouts-hub-cluster       Synced        Healthy
+argocd-hub-cluster              Synced        Healthy
+bootstrap                       Synced        Healthy
+cert-manager-hub-cluster        Synced        Healthy
+cluster-addons                  Synced        Healthy
+cluster-workloads               Synced        Healthy
+clusters                        Synced        Healthy
+external-secrets-hub-cluster    Synced        Healthy
+ingress-class-alb-hub-cluster   Synced        Healthy
+kargo-hub-cluster               Synced        Healthy
+kro-eks-rgs-hub-cluster         Synced        Healthy
+kro-hub-cluster                 Synced        Healthy
+kyverno-hub-cluster             Synced        Healthy
+metrics-server-hub-cluster      Synced        Healthy
+multi-acct-hub-cluster          Synced        Healthy
+```
 
 ### Bootstrapping Management/Spoke accounts
 
@@ -255,59 +281,45 @@ ACK controllers can work cross AWS accounts, but that need to isolate resources 
 If you want to do deploy your EKS clusters in multiple AWS accounts, you need to update this configuration.
 If you just want to only use one account, you still need to specify the AWS account to use for each namespaces.
 
-We use management account ID:
+We use management account ID to deploy `test`, `pre-prod`, `prod-eu` and `prod-us` clusters:
 
 ```sh
 sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml"
 code $WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml
 ```
 
-Uncomment `cluster-test` and `cluster-pre-prod` values:
+2. Add, Commit and Push
 
-```yaml
-clusters:
-   cluster-test: "012345678910"
-   cluster-pre-prod: "012345678910"
+```sh
+cd $WORKSPACE_PATH/$WORKING_REPO/
+git status
+git add .
+git commit -m "add namespaces and resources for clusters"
+git push
 ```
 
-2. Update cluster definitions:
+3. Refresh `multi-acct-hub-cluster` Argo CD application to create namespaces for clusters.
+
+4. Update cluster definitions with Management account ID:
 
 ```sh
 sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 code $WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml
 ```
 
-3. Uncomment clusters `cluster-test` and `cluster-pre-prod` to deploy:
+> The clusters will be deployed to `eu-central-1`, `eu-west-1` and `us-west-2`.
 
-```yaml
-   cluster-test:
-      managementAccountId: "012345678910" # replace the AWS account ID used for management cluster
-      accountId: "123456789101" # replace the AWS account ID used for spoke workload cluster (It can be the same)
-      tenant: "tenant1" # We have only configure tenant1 in the repo, If you change it, you need to duplicate all tenant1 directories
-      k8sVersion: "1.30"
-      gitops:
-         addonsRepoUrl: "https://github.com/XXXXX/eks-cluster-mgmt"
-         fleetRepoUrl: "https://github.com/XXXXX/eks-cluster-mgmt"
-         platformRepoUrl: "https://github.com/XXXXX/eks-cluster-mgmt"
-         workloadRepoUrl: "https://github.com/XXXXX/eks-cluster-mgmt"
-      ...
-   cluster-pre-prod:
-   ...
-```
-
-4. Add, Commit and Push
+5. Add, Commit and Push
 
 ```sh
 cd $WORKSPACE_PATH/$WORKING_REPO/
 git status
 git add .
-git commit -m "add clusters cluster-test and pre-prod"
+git commit -m "add clusters definitions"
 git push
 ```
 
-5. Sync `multi-acct-hub-cluster` Argo CD application to create namespaces for clusters.
-
-6. Sync/Refresh `clusters` Argo CD application to start deployment of the clusters.
+6. Refresh `clusters` Argo CD application to start deployment of the clusters.
 
 7. After some times, the clusters should have been created in the spoke/management account(s):
 
@@ -317,8 +329,10 @@ kubectl get EksClusterwithvpcs -A
 
 ```sh
 NAMESPACE   NAME                STATE    SYNCED   AGE
-argocd      cluster-pre-prod   IN_PROGRESS   False    113s
-argocd      cluster-test       IN_PROGRESS   False    113s
+argocd      cluster-pre-prod   IN_PROGRESS   False    110s
+argocd      cluster-prod-eu    IN_PROGRESS   False    110s
+argocd      cluster-prod-us    IN_PROGRESS   False    110s
+argocd      cluster-test       IN_PROGRESS   False    110s
 ```
 
 ```sh
@@ -346,6 +360,46 @@ kubectl get eksclusters.kro.run -A
 kubectl get clusters.eks.services.k8s.aws -A -o yaml # Check there are no errors
 kubectl get eksclusters -A
 kubectl get eksclusterwithvpc -A
+```
+
+Check that all ArgoCD Applications have been deployed to spoke clusters:
+
+```sh
+kubectl get applications -n argocd
+```
+
+```sh
+NAME                                 SYNC STATUS   HEALTH STATUS
+ack-ec2-hub-cluster                  Synced        Healthy
+ack-eks-hub-cluster                  Synced        Healthy
+ack-iam-hub-cluster                  Synced        Healthy
+argo-rollouts-cluster-pre-prod       Synced        Healthy
+argo-rollouts-cluster-prod-eu        Synced        Healthy
+argo-rollouts-cluster-prod-us        Synced        Healthy
+argo-rollouts-cluster-test           Synced        Healthy
+argo-rollouts-hub-cluster            Synced        Healthy
+argocd-hub-cluster                   Synced        Healthy
+bootstrap                            Synced        Healthy
+cert-manager-hub-cluster             Synced        Healthy
+cluster-addons                       Synced        Healthy
+cluster-workloads                    Synced        Healthy
+clusters                             Synced        Healthy
+external-secrets-hub-cluster         Synced        Healthy
+ingress-class-alb-cluster-pre-prod   Synced        Healthy
+ingress-class-alb-cluster-prod-eu    Synced        Healthy
+ingress-class-alb-cluster-prod-us    Synced        Healthy
+ingress-class-alb-cluster-test       Synced        Healthy
+ingress-class-alb-hub-cluster        Synced        Healthy
+kargo-hub-cluster                    Synced        Healthy
+kro-eks-rgs-hub-cluster              Synced        Healthy
+kro-hub-cluster                      Synced        Healthy
+kyverno-hub-cluster                  Synced        Healthy
+metrics-server-cluster-pre-prod      Synced        Healthy
+metrics-server-cluster-prod-eu       Synced        Healthy
+metrics-server-cluster-prod-us       Synced        Healthy
+metrics-server-cluster-test          Synced        Healthy
+metrics-server-hub-cluster           Synced        Healthy
+multi-acct-hub-cluster               Synced        Healthy
 ```
 
 ### Creating a container image for demo application.
@@ -512,93 +566,30 @@ EOF
 kubectl -n kargo rollout restart deploy kargo-controller
 ```
 
-3. Wait until `rollouts-demo-test` and `rollouts-demo-pre-prod` are fully operational and test Urls.
+3. Wait until `rollouts-demo-*` ArgoCD Applications are fully operational and test them.
 
 4. Build a new container images and observe deployment, continuous promotion from `test` to `prep-prod` and rollouts:
 
 ```sh
-$WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh red
+$WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh orange
 ```
 
-### Enabling prod clusters
-
-1. Uncomment `cluster-prod-eu` and `cluster-prod-us`:
+5. Install Argo Rollouts plugin:
 
 ```sh
-code $WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml\
-code $WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml
+curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+chmod +x ./kubectl-argo-rollouts-linux-amd64
+sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+kubectl argo rollouts version
 ```
 
-2. Add, Commit and Push:
+### Promote the application to prod clusters
 
-```sh
-cd $WORKSPACE_PATH/$WORKING_REPO/
-git status
-git add .
-git commit -m "Deploy prod clusters"
-git push
-```
+1. Login to Kargo UI and `Promote` active Freight to `prod-eu` and `prod-us`.
 
-3. Go to Argo CD UI and sync `multi-acct-hub-cluster` Argo CD application to create namespaces for clusters.
+2. Wait until `rollouts-demo-prod-eu` and `rollouts-demo-prod-us` are fully operational and test Urls.
 
-4. Sync `clusters` Argo CD application to start deployment of the clusters.
-
-5. After some times, the clusters should have been created in the spoke/management account(s):
-
-```sh
-kubectl get EksClusterwithvpcs -A
-```
-
-```sh
-NAMESPACE   NAME               STATE         SYNCED   AGE
-argocd      cluster-pre-prod   ACTIVE        True     161m
-argocd      cluster-prod-eu    IN_PROGRESS   False    109s
-argocd      cluster-prod-us    IN_PROGRESS   False    109s
-argocd      cluster-test       ACTIVE        True     3h1m
-```
-
-```sh
-argocd      cluster-pre-prod   ACTIVE   True     3h32m
-argocd      cluster-prod-eu    ACTIVE   True     20m
-argocd      cluster-prod-us    ACTIVE   True     21m
-argocd      cluster-test       ACTIVE   True     3h51m
-```
-
-### Enabling continuous promotion to prod clusters
-
-1. Enable Kargo configuration:
-
-```sh
-mv $WORKSPACE_PATH/rollouts-demo-deploy/env-add/* $WORKSPACE_PATH/rollouts-demo-deploy/env/
-```
-
-2. Uncomment `prod-eu` and `prod-us` Kargo Stages:
-
-```sh
-code $WORKSPACE_PATH/rollouts-demo-deploy/kargo/stages.yaml
-```
-
-```sh
-code $WORKSPACE_PATH/rollouts-demo-deploy/kargo/project.yaml
-```
-
-3. Add, Commit and Push:
-
-```sh
-cd $WORKSPACE_PATH/rollouts-demo-deploy/
-git status
-git add .
-git commit -m "Enabling continuous promotion to prod clusters"
-git push
-```
-
-4. Login to Argo CD UI and Sync `rollouts-demo-kargo` Argo CD application.
-
-5. Login to Kargo UI and `Promote` active Freight to `prod-eu` and `prod-us`.
-
-6. Wait until `rollouts-demo-prod-eu` and `rollouts-demo-prod-us` are fully operational and test Urls.
-
-7. Build a new container image and test complete continuous promotion process:
+3. Build a new container image and test complete continuous promotion process:
 
 ```sh
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh green
@@ -674,24 +665,6 @@ argocd      cluster-prod-eu    DELETING   False    114m
 argocd      cluster-prod-us    DELETING   False    114m
 argocd      cluster-test       DELETING   False    4h54m
 ```
-
-<!-- 5. Disable `clusters` Argo CD application:
-
-```sh
-mv $WORKSPACE_PATH/$WORKING_REPO/fleet/bootstrap/clusters.yaml $WORKSPACE_PATH/$WORKING_REPO/fleet/bootstrap/excluded/
-```
-
-2. Add, Commit and Push:
-
-```sh
-cd $WORKSPACE_PATH/$WORKING_REPO/
-git status
-git add .
-git commit -m "Disable Clusters Argo CD application"
-git push
-```
-
-3. Login to Argo CD UI and Sync `bootstrap` Argo CD application with `Prune` option checked. Wait until `cluster-workloads` will be deleted. -->
 
 5. Once you have successfully de-registered all spoke EKS clusters, you can remove the Hub cluster created with Terraform and created roles:
 

@@ -11,7 +11,7 @@ spec:
     autoPromotionEnabled: true
   - stage: pre-prod
     autoPromotionEnabled: true
-  # - stage: prod-eu
-  #   autoPromotionEnabled: false
-  # - stage: prod-us
-  #   autoPromotionEnabled: false
+  - stage: prod-eu
+    autoPromotionEnabled: false
+  - stage: prod-us
+    autoPromotionEnabled: false
