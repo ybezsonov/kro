@@ -586,6 +586,23 @@ $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh green
 ```
 
+<!-- ```sh
+envsubst << 'EOF' | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+   name: git-workloads-infra-kargo
+   namespace: workloads-infra-kargo
+   labels:
+      kargo.akuity.io/cred-type: git
+stringData:
+   url: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/${WORKING_REPO}.git
+   password: $IDE_PASSWORD
+   username: $GITEA_USERNAME
+EOF
+kubectl -n kargo rollout restart deploy kargo-controller
+``` -->
+
 ![Kargo continuous promotion](docs/kargo-promotion.png)
 
 ## Conclusion

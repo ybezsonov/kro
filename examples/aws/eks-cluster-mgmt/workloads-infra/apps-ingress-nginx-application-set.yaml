@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: ingress-nginx
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+        revision: HEAD
+        directories:
+          - path: workloads-infra/apps/ingress-nginx/env/*
+  template:
+    metadata:
+      name: 'ingress-nginx-{{path.basename}}'
+      annotations:
+        kargo.akuity.io/authorized-stage: 'workloads-infra-kargo:{{path.basename}}'
+    spec:
+      project: default
+      destination:
+        name: 'cluster-{{path.basename}}'
+        namespace: 'ingress-nginx'
+      source:
+        path: './'
+        repoURL: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+        targetRevision: 'workloads-infra/apps/ingress-nginx/env/{{path.basename}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
