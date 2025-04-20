@@ -6,7 +6,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+        repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
         revision: HEAD
         directories:
           - path: workloads-infra/apps/ingress-nginx/env/*
@@ -22,7 +22,7 @@ spec:
         namespace: 'ingress-nginx'
       source:
         path: './'
-        repoURL: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+        repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
         targetRevision: 'workloads-infra/apps/ingress-nginx/env/{{path.basename}}'
       syncPolicy:
         automated:

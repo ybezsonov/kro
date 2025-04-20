@@ -6,7 +6,7 @@ metadata:
 spec:
   vars:
   - name: repoURL
-    value: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+    value: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
   - name: branch
     value: main
   steps:
@@ -76,11 +76,9 @@ spec:
 # spec:
 #   vars:
 #   - name: repoURL
-#     value: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/workloads-infra-deploy.git
+#     value: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/GIT_CLUSTER_MGMT_URLGIT_ORG_NAME.git
 #   - name: branch
 #     value: main
-#   - name: image
-#     value: 016699401805.dkr.ecr.eu-central-1.amazonaws.com/workloads-infra
 #   steps:
 #   # Clone the Git repository that contains the Kustomize configuration
 #   # to the ./src directory, and the environment configuration to ./out.

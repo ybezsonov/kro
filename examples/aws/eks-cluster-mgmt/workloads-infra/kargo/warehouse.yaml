@@ -6,7 +6,7 @@ metadata:
 spec:
   subscriptions:
   - git:
-      repoURL: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+      repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
       # insecureSkipTLSVerify: true
       branch: main
       includePaths:

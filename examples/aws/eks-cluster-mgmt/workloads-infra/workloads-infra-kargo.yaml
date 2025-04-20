@@ -10,7 +10,7 @@ spec:
   project: default
   source:
     path: ./workloads-infra/kargo
-    repoURL: https://d20lu4n906ar7.cloudfront.net/gitea/workshop-user/eks-cluster-mgmt.git
+    repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
   syncPolicy:
     automated:
       prune: true
