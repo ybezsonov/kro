@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: ingress-nginx
+  name: workloads-infra-apps
   namespace: argocd
 spec:
   generators:
@@ -9,21 +9,21 @@ spec:
         repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
         revision: HEAD
         directories:
-          - path: workloads-infra/apps/ingress-nginx/env/*
+          - path: workloads-infra/apps/env/*
   template:
     metadata:
-      name: 'ingress-nginx-{{path.basename}}'
+      name: 'workloads-infra-apps-{{path.basename}}'
       annotations:
         kargo.akuity.io/authorized-stage: 'workloads-infra-kargo:{{path.basename}}'
     spec:
       project: default
       destination:
         name: 'cluster-{{path.basename}}'
-        namespace: 'ingress-nginx'
+        # namespace: 'ingress-nginx'
       source:
         path: './'
         repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
-        targetRevision: 'workloads-infra/apps/ingress-nginx/env/{{path.basename}}'
+        targetRevision: 'workloads-infra/apps/env/{{path.basename}}'
       syncPolicy:
         automated:
           prune: true

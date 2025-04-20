@@ -596,7 +596,7 @@ metadata:
    labels:
       kargo.akuity.io/cred-type: git
 stringData:
-   url: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/${WORKING_REPO}.git
+   repoURL: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/${WORKING_REPO}.git
    password: $IDE_PASSWORD
    username: $GITEA_USERNAME
 EOF
