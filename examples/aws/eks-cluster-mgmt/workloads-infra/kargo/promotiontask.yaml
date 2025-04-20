@@ -76,7 +76,7 @@ spec:
 # spec:
 #   vars:
 #   - name: repoURL
-#     value: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/GIT_CLUSTER_MGMT_URLGIT_ORG_NAME.git
+#     value: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
 #   - name: branch
 #     value: main
 #   steps:
