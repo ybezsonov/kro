@@ -288,6 +288,8 @@ sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REP
 code $WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml
 ```
 
+> Uncomment cluster-* in the file.
+
 2. Add, Commit and Push
 
 ```sh
@@ -306,7 +308,7 @@ git push
 sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 code $WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml
 ```
-
+> Uncomment cluster-* in the file.
 > The clusters will be deployed to `eu-central-1`, `eu-west-1` and `us-west-2`.
 
 5. Add, Commit and Push
