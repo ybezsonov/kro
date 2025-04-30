@@ -1,15 +1,16 @@
-// Copyright 2025 The Kube Resource Orchestrator Authors.
+// Copyright 2025 The Kube Resource Orchestrator Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License"). You may
-// not use this file except in compliance with the License. A copy of the
-// License is located at
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// or in the "license" file accompanying this file. This file is distributed
-// on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-// express or implied. See the License for the specific language governing
-// permissions and limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package simpleschema
 
@@ -208,13 +209,28 @@ func (tf *transformer) applyMarkers(schema *extv1.JSONSchemaProps, markers []*Ma
 		case MarkerTypeDescription:
 			schema.Description = marker.Value
 		case MarkerTypeMinimum:
-			if val, err := strconv.ParseFloat(marker.Value, 64); err == nil {
-				schema.Minimum = &val
+			val, err := strconv.ParseFloat(marker.Value, 64)
+			if err != nil {
+				return fmt.Errorf("failed to parse minimum enum value: %w", err)
 			}
+			schema.Minimum = &val
 		case MarkerTypeMaximum:
-			if val, err := strconv.ParseFloat(marker.Value, 64); err == nil {
-				schema.Maximum = &val
+			val, err := strconv.ParseFloat(marker.Value, 64)
+			if err != nil {
+				return fmt.Errorf("failed to parse maximum enum value: %w", err)
 			}
+			schema.Maximum = &val
+		case MarkerTypeValidation:
+			if marker.Value == "" {
+				return fmt.Errorf("validation failed")
+			}
+			validation := []extv1.ValidationRule{
+				{
+					Rule:    marker.Value,
+					Message: "validation failed",
+				},
+			}
+			schema.XValidations = validation
 		case MarkerTypeEnum:
 			var enumJSONValues []extv1.JSON
 

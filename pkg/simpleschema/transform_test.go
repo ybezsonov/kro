@@ -1,15 +1,16 @@
-// Copyright 2025 The Kube Resource Orchestrator Authors.
+// Copyright 2025 The Kube Resource Orchestrator Authors
 //
-// Licensed under the Apache License, Version 2.0 (the "License"). You may
-// not use this file except in compliance with the License. A copy of the
-// License is located at
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
-// or in the "license" file accompanying this file. This file is distributed
-// on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-// express or implied. See the License for the specific language governing
-// permissions and limitations under the License.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package simpleschema
 
@@ -360,6 +361,66 @@ func TestBuildOpenAPISchema(t *testing.T) {
 			want:    nil,
 			wantErr: true,
 		},
+		{
+			name: "Simple string validation",
+			obj: map[string]interface{}{
+				"name": `string | validation="self.name != 'invalid'"`,
+			},
+			want: &extv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]extv1.JSONSchemaProps{
+					"name": {
+						Type: "string",
+						XValidations: []extv1.ValidationRule{
+							{
+								Rule:    "self.name != 'invalid'",
+								Message: "validation failed",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Multiple field validations",
+			obj: map[string]interface{}{
+				"age":  `integer | validation="self.age >= 0 && self.age <= 120"`,
+				"name": `string | validation="self.name.length() >= 3"`,
+			},
+			want: &extv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]extv1.JSONSchemaProps{
+					"age": {
+						Type: "integer",
+						XValidations: []extv1.ValidationRule{
+							{
+								Rule:    "self.age >= 0 && self.age <= 120",
+								Message: "validation failed",
+							},
+						},
+					},
+					"name": {
+						Type: "string",
+						XValidations: []extv1.ValidationRule{
+							{
+								Rule:    "self.name.length() >= 3",
+								Message: "validation failed",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Empty validation",
+			obj: map[string]interface{}{
+				"age": `integer | validation=""`,
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -379,77 +440,80 @@ func TestBuildOpenAPISchema(t *testing.T) {
 func TestLoadPreDefinedTypes(t *testing.T) {
 	transformer := newTransformer()
 
-	preDefinedTypes := map[string]interface{}{
-		"Person": map[string]interface{}{
-			"name": "string",
-			"age":  "integer",
-			"address": map[string]interface{}{
-				"street": "string",
-				"city":   "string",
-			},
-		},
-		"Company": map[string]interface{}{
-			"name":      "string",
-			"employees": "[]string",
-		},
-	}
-
-	err := transformer.loadPreDefinedTypes(preDefinedTypes)
-	if err != nil {
-		t.Fatalf("LoadPreDefinedTypes() error = %v", err)
-	}
-
-	if len(transformer.preDefinedTypes) != 2 {
-		t.Errorf("LoadPreDefinedTypes() loaded %d types, want 2", len(transformer.preDefinedTypes))
-	}
-
-	// Check Person type
-	personType, ok := transformer.preDefinedTypes["Person"]
-	if !ok {
-		t.Errorf("LoadPreDefinedTypes() did not load 'Person' type")
-	}
-
-	expectedPersonType := extv1.JSONSchemaProps{
-		Type: "object",
-		Properties: map[string]extv1.JSONSchemaProps{
-			"name": {Type: "string"},
-			"age":  {Type: "integer"},
-			"address": {
-				Type: "object",
-				Properties: map[string]extv1.JSONSchemaProps{
-					"street": {Type: "string"},
-					"city":   {Type: "string"},
+	tests := []struct {
+		name    string
+		obj     map[string]interface{}
+		want    map[string]extv1.JSONSchemaProps
+		wantErr bool
+	}{
+		{
+			name: "Valid types",
+			obj: map[string]interface{}{
+				"Person": map[string]interface{}{
+					"name": "string",
+					"age":  "integer",
+					"address": map[string]interface{}{
+						"street": "string",
+						"city":   "string",
+					},
+				},
+				"Company": map[string]interface{}{
+					"name":      "string",
+					"employees": "[]string",
 				},
 			},
-		},
-	}
-
-	if !reflect.DeepEqual(personType, expectedPersonType) {
-		t.Errorf("LoadPreDefinedTypes() 'Person' type = %v, want %v", personType, expectedPersonType)
-	}
-
-	// Check Company type
-	companyType, ok := transformer.preDefinedTypes["Company"]
-	if !ok {
-		t.Errorf("LoadPreDefinedTypes() did not load 'Company' type")
-	}
-
-	expectedCompanyType := extv1.JSONSchemaProps{
-		Type: "object",
-		Properties: map[string]extv1.JSONSchemaProps{
-			"name": {Type: "string"},
-			"employees": {
-				Type: "array",
-				Items: &extv1.JSONSchemaPropsOrArray{
-					Schema: &extv1.JSONSchemaProps{
-						Type: "string",
+			want: map[string]extv1.JSONSchemaProps{
+				"Person": {
+					Type: "object",
+					Properties: map[string]extv1.JSONSchemaProps{
+						"name": {Type: "string"},
+						"age":  {Type: "integer"},
+						"address": {
+							Type: "object",
+							Properties: map[string]extv1.JSONSchemaProps{
+								"street": {Type: "string"},
+								"city":   {Type: "string"},
+							},
+						},
+					},
+				},
+				"Company": {
+					Type: "object",
+					Properties: map[string]extv1.JSONSchemaProps{
+						"name": {Type: "string"},
+						"employees": {
+							Type: "array",
+							Items: &extv1.JSONSchemaPropsOrArray{
+								Schema: &extv1.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
 					},
 				},
 			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid type",
+			obj: map[string]interface{}{
+				"invalid": 123,
+			},
+			want:    map[string]extv1.JSONSchemaProps{},
+			wantErr: true,
 		},
 	}
 
-	if !reflect.DeepEqual(companyType, expectedCompanyType) {
-		t.Errorf("LoadPreDefinedTypes() 'Company' type = %v, want %v", companyType, expectedCompanyType)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := transformer.loadPreDefinedTypes(tt.obj)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("LoadPreDefinedTypes() error = %v", err)
+				return
+			}
+			if !reflect.DeepEqual(transformer.preDefinedTypes, tt.want) {
+				t.Errorf("LoadPreDefinedTypes() = %+v, want %+v", transformer.preDefinedTypes, tt.want)
+			}
+		})
 	}
 }
