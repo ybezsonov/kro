@@ -9,18 +9,7 @@ metadata:
 spec:
   ingressClassName: "nginx"
   rules:
-    - host: localhost
-      http:
-        paths:
-          - path: /argo-workflows(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: argo-server
-                port:
-                  name: web
-    - host: cnoe.localtest.me:8443
-      http:
+    - http:
         paths:
           - path: /argo-workflows(/|$)(.*)
             pathType: ImplementationSpecific

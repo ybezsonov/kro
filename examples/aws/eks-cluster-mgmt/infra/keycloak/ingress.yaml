@@ -10,8 +10,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: cnoe.localtest.me:8443
-      http:
+    - http:
         paths:
           - path: /keycloak
             pathType: ImplementationSpecific

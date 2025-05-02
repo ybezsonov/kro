@@ -145,7 +145,7 @@ data:
       "rootUrl": "",
       "baseUrl": "",
       "redirectUris": [
-        "https://cnoe.localtest.me:8443/argo-workflows/oauth2/callback"
+        "HUB_INGRESS_URL/argo-workflows/oauth2/callback"
       ],
       "webOrigins": [
         "/*"
@@ -174,7 +174,7 @@ data:
       "rootUrl": "",
       "baseUrl": "",
       "redirectUris": [
-        "https://cnoe.localtest.me:8443/api/auth/keycloak-oidc/handler/frame"
+        "HUB_INGRESS_URL/api/auth/keycloak-oidc/handler/frame"
       ],
       "webOrigins": [
         "/*"

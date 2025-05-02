@@ -11,23 +11,24 @@ spec:
       targetRevision: 4.12.1
       helm:
         releaseName: ingress-nginx
-        parameters:
-          - name: controller.config.hsts
-            value: 'false'
-          - name: controller.service.type
-            value: LoadBalancer
-          - name: controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-name"
-            value: "hub-ingress"
-          - name: controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"
-            value: "external"
-          - name: controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"
-            value: "internet-facing"
-          - name: controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-nlb-target-type"
-            value: "ip"
-          - name: controller.service.loadbalancerClass
-            value: "service.k8s.aws/nlb"
-          - name: controller.service.targetPorts.https
-            value: 'https'
+        values: |
+          controller:
+            service:
+              type: LoadBalancer
+              annotations:
+                service.beta.kubernetes.io/aws-load-balancer-name: "hub-ingress"
+                service.beta.kubernetes.io/aws-load-balancer-type: "external"
+                service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+                service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+              loadbalancerClass: "service.k8s.aws/nlb"
+              ports:
+                http: 80
+                https: 443
+            containerPort:
+              http: 80
+              https: 443
+          tcp:
+            22: "gitlab/gitlab:22"
   destination:
     server: "https://kubernetes.default.svc"
     namespace: ingress-nginx

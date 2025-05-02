@@ -70,7 +70,7 @@ data:
   app-config.yaml: |
     app:
       title: CNOE Backstage
-      baseUrl: https://cnoe.localtest.me:8443
+      baseUrl: HUB_INGRESS_URL
     organization:
       name: CNOE
     backend:
@@ -80,7 +80,7 @@ data:
       # auth:
       #   keys:
       #     - secret: ${BACKEND_SECRET}
-      baseUrl: https://cnoe.localtest.me:8443
+      baseUrl: HUB_INGRESS_URL
       listen:
         port: 7007
         # Uncomment the following host directive to bind to specific interfaces
@@ -90,7 +90,7 @@ data:
         # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
         # Default Helmet Content-Security-Policy values can be removed by setting the key to false
       cors:
-        origin: https://cnoe.localtest.me:8443
+        origin: HUB_INGRESS_URL
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
         credentials: true
       database:
@@ -104,16 +104,16 @@ data:
         store: memory
       # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
-    integrations:
-      gitea:
-        - baseUrl: https://GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-          host: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-          username: ${GITEA_USERNAME}
-          password: ${GITEA_PASSWORD}
-        - baseUrl: https://GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-          host: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-          username: ${GITEA_USERNAME}
-          password: ${GITEA_PASSWORD}
+    # integrations:
+    #   gitea:
+    #     - baseUrl: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
+    #       host: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
+    #       username: ${GITEA_USERNAME}
+    #       password: ${GITEA_PASSWORD}
+    #     - baseUrl: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
+    #       host: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
+    #       username: ${GITEA_USERNAME}
+    #       password: ${GITEA_PASSWORD}
     #  github:
     #    - host: github.com
     #      apps:
@@ -375,14 +375,14 @@ spec:
     template:
       engineVersion: v2
       data:
-        BACKSTAGE_FRONTEND_URL: https://cnoe.localtest.me:8443/backstage
+        BACKSTAGE_FRONTEND_URL: HUB_INGRESS_URL
         POSTGRES_HOST: postgresql.backstage.svc.cluster.local
         POSTGRES_PORT: '5432'
         POSTGRES_DB: backstage
         POSTGRES_USER: backstage
         POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
-        ARGO_WORKFLOWS_URL: https://cnoe.localtest.me:8443/argo-workflows
-        KEYCLOAK_NAME_METADATA: https://cnoe.localtest.me:8443/keycloak/realms/cnoe/.well-known/openid-configuration
+        ARGO_WORKFLOWS_URL: HUB_INGRESS_URL/argo-workflows
+        KEYCLOAK_NAME_METADATA: HUB_INGRESS_URL/keycloak/realms/cnoe/.well-known/openid-configuration
         KEYCLOAK_CLIENT_SECRET: "{{.BACKSTAGE_CLIENT_SECRET}}"
         ARGOCD_AUTH_TOKEN: "argocd.token={{.ARGOCD_SESSION_TOKEN}}"
         ARGO_CD_URL: 'https://argocd-server.argocd.svc.cluster.local/api/v1/'
@@ -412,8 +412,8 @@ metadata:
   namespace: backstage
 type: Opaque
 stringData:
-  GITEA_USERNAME: "workshop-user"
-  GITEA_PASSWORD: "${GITEA_PASSWORD}"
+  GITEA_USERNAME: "GIT_ORG_NAME"
+  GITEA_PASSWORD: "G7DcOoBlDtzJvXKRwgoozZh0hLIcNSI1"
 # apiVersion: external-secrets.io/v1beta1
 # kind: ExternalSecret
 # metadata:
@@ -444,18 +444,7 @@ metadata:
 spec:
   ingressClassName: "nginx"
   rules:
-    - host: localhost
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: backstage
-                port:
-                  name: http
-    - host: cnoe.localtest.me:8443
-      http:
+    - http:
         paths:
           - path: /
             pathType: Prefix

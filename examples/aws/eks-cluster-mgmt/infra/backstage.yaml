@@ -10,7 +10,7 @@ spec:
     namespace: backstage
     server: "https://kubernetes.default.svc"
   source:
-    repoURL: https://GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
+    repoURL: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt.git
     targetRevision: HEAD
     path: "./infra/backstage/manifests"
   project: default
