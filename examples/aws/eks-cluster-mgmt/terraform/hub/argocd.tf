@@ -2,12 +2,33 @@
 # GitOps Bridge: Private ssh keys for git
 ################################################################################
 resource "kubernetes_namespace" "argocd" {
-  depends_on = [local.cluster_info]
+  depends_on = [
+    local.cluster_info
+  ]
 
   metadata {
     name = local.argocd_namespace
   }
 }
+
+# Store bcrypt hash in a local variable to avoid regenerating it on each run
+locals {
+  password_hash_file = "${path.module}/argocd-password-hash.txt"
+  existing_hash = fileexists(local.password_hash_file) ? file(local.password_hash_file) : ""
+  password_hash = local.existing_hash != "" ? local.existing_hash : bcrypt(data.external.env_vars.result.IDE_PASSWORD)
+}
+
+# Create the hash file if it doesn't exist, but don't use count
+resource "local_file" "argocd_password_hash" {
+  content  = local.password_hash
+  filename = local.password_hash_file
+
+  # Only update the file if it doesn't exist or is empty
+  lifecycle {
+    ignore_changes = [content]
+  }
+}
+
 resource "kubernetes_secret" "git_secrets" {
   depends_on = [kubernetes_namespace.argocd]
   for_each = {
@@ -49,6 +70,37 @@ resource "aws_ssm_parameter" "argocd_hub_role" {
   type  = "String"
   value = module.argocd_hub_pod_identity.iam_role_arn
 }
+
+# Create IDE password secret in ArgoCD namespace
+resource "kubernetes_secret" "ide_password" {
+  depends_on = [kubernetes_namespace.argocd]
+
+  metadata {
+    name      = "ide-password"
+    namespace = "argocd"
+  }
+
+  data = {
+    password = data.external.env_vars.result.IDE_PASSWORD
+  }
+}
+
+# Create Gitea credentials secret in ArgoCD namespace
+resource "kubernetes_secret" "gitea_credentials" {
+  depends_on = [kubernetes_namespace.argocd]
+
+  metadata {
+    name      = "gitea-credentials"
+    namespace = "argocd"
+  }
+
+  data = {
+    GITEA_EXTERNAL_URL = data.external.env_vars.result.GITEA_EXTERNAL_URL
+    GITEA_USERNAME     = data.external.env_vars.result.GITEA_USERNAME
+    GITEA_PASSWORD     = data.external.env_vars.result.GITEA_PASSWORD
+  }
+}
+
 ################################################################################
 # GitOps Bridge: Bootstrap
 ################################################################################
@@ -66,10 +118,58 @@ module "gitops_bridge_bootstrap" {
   argocd = {
     name             = "argocd"
     namespace        = local.argocd_namespace
-    chart_version    = "7.7.8"
-    values           = [file("${path.module}/argocd-initial-values.yaml")]
+    chart_version    = "8.0.0"
+    values           = [
+      templatefile("${path.module}/argocd-initial-values.yaml", {
+        DOMAIN_NAME = local.cloudfront_domain_name
+        ADMIN_PASSWORD = local.password_hash
+      })
+    ]
     timeout          = 600
     create_namespace = false
   }
   depends_on = [kubernetes_secret.git_secrets]
+}
+
+################################################################################
+# ArgoCD NLB Ingress
+################################################################################
+resource "kubernetes_ingress_v1" "argocd_nlb" {
+  depends_on = [module.gitops_bridge_bootstrap]
+
+  metadata {
+    name      = "argocd-nlb"
+    namespace = local.argocd_namespace
+    annotations = {
+      "kubernetes.io/ingress.class" = "nginx"
+    }
+  }
+
+  spec {
+    ingress_class_name = "nginx"
+    rule {
+      host = local.ingress_nlb_domain_name
+      http {
+        path {
+          path      = "/argocd"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = "argocd-server"
+              port {
+                number = 80
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# Output the ArgoCD admin password
+output "admin_password" {
+  description = "The admin password"
+  value       = "${data.external.env_vars.result.IDE_PASSWORD}"
 }

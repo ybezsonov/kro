@@ -27,8 +27,6 @@ metadata:
     app: keycloak
   name: keycloak
   namespace: keycloak
-  annotations:
-    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
@@ -43,18 +41,28 @@ spec:
         - args:
             - start-dev
           env:
-            - name: KEYCLOAK_ADMIN
-              value: cnoe-admin
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: "admin"
+            # - name: KC_HOSTNAME
+            #   valueFrom:
+            #     configMapKeyRef:
+            #       name: keycloak-config
+            #       key: keycloak-url
+            #       optional: true
+            # - name: KC_HOSTNAME_ADMIN
+            #   valueFrom:
+            #     configMapKeyRef:
+            #       name: keycloak-config
+            #       key: keycloak-url
+            #       optional: true
             - name: KEYCLOAK_LOGLEVEL
               value: ALL
             - name: QUARKUS_TRANSACTION_MANAGER_ENABLE_RECOVERY
               value: 'true'
-            - name: KC_PROXY
-              value: "edge"
           envFrom:
             - secretRef:
                 name: keycloak-config
-          image: quay.io/keycloak/keycloak:22.0.3
+          image: quay.io/keycloak/keycloak:26.2.3
           name: keycloak
           ports:
             - containerPort: 8080
@@ -78,25 +86,18 @@ data:
     # Database
     # The database vendor.
     db=postgres
-    
+
     # The username of the database user.
     db-url=jdbc:postgresql://postgresql.keycloak.svc.cluster.local:5432/postgres
 
-    # The proxy address forwarding mode if the server is behind a reverse proxy.
-    proxy=edge
-
-    # hostname configuration - simplified to avoid redirect loops
-    hostname-url=HUB_INGRESS_URL/keycloak
-    hostname-admin-url=HUB_INGRESS_URL/keycloak
+    # hostname settings
+    hostname=https://{{ .Values.domain_name }}/keycloak
+    hostname-admin=https://{{ .Values.domain_name }}/keycloak
+    hostname-strict=true
     http-relative-path=keycloak
-    https-port=443
-    hostname-port=443
     http-enabled=true
-    proxy-headers=xforwarded
-    # this should only be allowed in development. NEVER in production.
-    hostname-strict=false
-    hostname-strict-backchannel=false
     hostname-debug=true
+    # .../keycloak/realms/platform/hostname-debug
 
 kind: ConfigMap
 metadata:
@@ -140,7 +141,7 @@ spec:
         - envFrom:
             - secretRef:
                 name: keycloak-config
-          image: docker.io/library/postgres:15.3-alpine3.18
+          image: docker.io/library/postgres:17.4-alpine3.21
           name: postgres
           env:
             - name: PGDATA
@@ -161,9 +162,8 @@ spec:
   - metadata:
       name: data
     spec:
-      storageClassName: sc-gp3
+      storageClassName: gp3
       accessModes: ["ReadWriteOnce"]
       resources:
         requests:
           storage: "500Mi"
-

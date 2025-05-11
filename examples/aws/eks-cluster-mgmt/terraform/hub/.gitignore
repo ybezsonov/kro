@@ -30,3 +30,6 @@ backend.hcl
 *.tmp
 *.temp
 .envrc
+
+# Ignore password hash files
+argocd-password-hash.txt

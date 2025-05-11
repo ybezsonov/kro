@@ -51,7 +51,17 @@ multi-acct:
 
 ingress-class-alb:
   enabled: true
-kargo:
+ingress-nginx:
+  enabled: true
+gitlab:
+  enabled: true
+keycloak:
   enabled: true
 argo-rollouts:
+  enabled: true
+argo-workflows:
+  enabled: true
+backstage:
+  enabled: true
+kargo:
   enabled: true

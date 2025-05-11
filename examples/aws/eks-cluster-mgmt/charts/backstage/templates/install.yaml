@@ -18,6 +18,7 @@ rules:
       - argoproj.io
     resources:
       - workflows
+      - applications
     verbs:
       - create
 ---
@@ -69,8 +70,8 @@ metadata:
 data:
   app-config.yaml: |
     app:
-      title: CNOE Backstage
-      baseUrl: HUB_INGRESS_URL
+      title: Platform Backstage
+      baseUrl: https://{{ .Values.ingress.host }}
     organization:
       name: CNOE
     backend:
@@ -80,7 +81,7 @@ data:
       # auth:
       #   keys:
       #     - secret: ${BACKEND_SECRET}
-      baseUrl: HUB_INGRESS_URL
+      baseUrl: https://{{ .Values.ingress.host }}
       listen:
         port: 7007
         # Uncomment the following host directive to bind to specific interfaces
@@ -90,7 +91,7 @@ data:
         # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
         # Default Helmet Content-Security-Policy values can be removed by setting the key to false
       cors:
-        origin: HUB_INGRESS_URL
+        origin: https://{{ .Values.ingress.host }}
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
         credentials: true
       database:
@@ -104,16 +105,12 @@ data:
         store: memory
       # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
-    # integrations:
-    #   gitea:
-    #     - baseUrl: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-    #       host: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-    #       username: ${GITEA_USERNAME}
-    #       password: ${GITEA_PASSWORD}
-    #     - baseUrl: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-    #       host: GIT_CLUSTER_MGMT_URLGIT_ORG_NAME
-    #       username: ${GITEA_USERNAME}
-    #       password: ${GITEA_PASSWORD}
+    integrations:
+      gitea:
+        - baseUrl: ${GITEA_EXTERNAL_URL}
+          host: ${DOMAIN_NAME}
+          username: ${GITEA_USERNAME}
+          password: ${GITEA_PASSWORD}
     #  github:
     #    - host: github.com
     #      apps:
@@ -126,6 +123,12 @@ data:
         # - host: ghe.example.net
         #   apiBaseUrl: https://ghe.example.net/api/v3
         #   token: ${GHE_TOKEN}
+
+    proxy:
+      ### Example for how to add a proxy endpoint for the frontend.
+      ### A typical reason to do this is to handle HTTPS and CORS for internal services.
+      endpoints:
+        '/provisioner': https://${DOMAIN_NAME}/
 
     # Reference documentation http://backstage.io/docs/features/techdocs/configuration
     # Note: After experimenting with basic setup, use CI/CD to generate docs
@@ -165,7 +168,7 @@ data:
       locations:
         # Examples from a public GitHub repository.
         - type: url
-          target: https://gitea/catalog-info.yaml
+          target: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/idpbuilder-localdev-backstage-templates-entities/raw/branch/main/catalog-info.yaml
           rules:
             - allow: [Component, System, API, Resource, Location, Template, User, Group]
     kubernetes:
@@ -180,7 +183,7 @@ data:
         - type: 'config'
           instances:
             - name: in-cluster
-              url: https://argocd/
+              url: https://${DOMAIN_NAME}/argocd
               username: admin
               password: ${ARGOCD_ADMIN_PASSWORD}
     argoWorkflows:
@@ -195,7 +198,10 @@ stringData:
   k8s-config.yaml: "type: 'config'\nclusters:\n  - url: https://kubernetes.default.svc.cluster.local\n
     \   name: local\n    authProvider: 'serviceAccount'\n    skipTLSVerify: true\n
     \   skipMetricsLookup: true\n    serviceAccountToken: \n      $file: /var/run/secrets/kubernetes.io/serviceaccount/token\n
-    \   caData: \n      $file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n"
+    \   caData: \n      $file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt\n
+    \ - url: K8S_SERVER\n
+    \   name: workshop\n    authProvider: 'serviceAccount'\n    skipTLSVerify: true\n
+    \   skipMetricsLookup: true\n    serviceAccountToken: SA_TOKEN\n"
 ---
 apiVersion: v1
 kind: Service
@@ -253,6 +259,10 @@ spec:
               value: debug
             - name: NODE_TLS_REJECT_UNAUTHORIZED
               value: "0"
+            - name: NODE_EXTRA_CA_CERTS
+              value: "/app/config/ca.crt"
+            - name: DOMAIN_NAME
+              value: {{ .Values.ingress.host }}
           envFrom:
             - secretRef:
                 name: backstage-env-vars
@@ -260,7 +270,7 @@ spec:
                 name: gitea-credentials
             - secretRef:
                 name: argocd-credentials
-          image: ghcr.io/cnoe-io/backstage-app:9232d633b2698fffa6d0a73b715e06640d170162
+          image: ghcr.io/cnoe-io/backstage-app:135c0cb26f3e004a27a11edb6a4779035aff9805
           name: backstage
           ports:
             - containerPort: 7007
@@ -292,8 +302,6 @@ metadata:
     app: postgresql
   name: postgresql
   namespace: backstage
-  annotations:
-    argocd.argoproj.io/sync-wave: "10"
 spec:
   replicas: 1
   selector:
@@ -324,7 +332,7 @@ spec:
                 secretKeyRef:
                   name: backstage-env-vars
                   key: POSTGRES_PASSWORD
-          image: docker.io/library/postgres:15.3-alpine3.18
+          image: docker.io/library/postgres:17.4-alpine3.21
           name: postgres
           ports:
             - containerPort: 5432
@@ -375,16 +383,16 @@ spec:
     template:
       engineVersion: v2
       data:
-        BACKSTAGE_FRONTEND_URL: HUB_INGRESS_URL
+        BACKSTAGE_FRONTEND_URL: https://{{ .Values.ingress.host }}
         POSTGRES_HOST: postgresql.backstage.svc.cluster.local
         POSTGRES_PORT: '5432'
         POSTGRES_DB: backstage
         POSTGRES_USER: backstage
-        POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
-        ARGO_WORKFLOWS_URL: HUB_INGRESS_URL/argo-workflows
-        KEYCLOAK_NAME_METADATA: HUB_INGRESS_URL/keycloak/realms/cnoe/.well-known/openid-configuration
-        KEYCLOAK_CLIENT_SECRET: "{{.BACKSTAGE_CLIENT_SECRET}}"
-        ARGOCD_AUTH_TOKEN: "argocd.token={{.ARGOCD_SESSION_TOKEN}}"
+        POSTGRES_PASSWORD: "{{ `{{.POSTGRES_PASSWORD}}` }}"
+        ARGO_WORKFLOWS_URL: https://{{ .Values.ingress.host }}/argo-workflows
+        KEYCLOAK_NAME_METADATA: https://{{ .Values.ingress.host }}/keycloak/realms/platform/.well-known/openid-configuration
+        KEYCLOAK_CLIENT_SECRET: "{{ `{{.BACKSTAGE_CLIENT_SECRET}}` }}"
+        ARGOCD_AUTH_TOKEN: "argocd.token={{ `{{.ARGOCD_SESSION_TOKEN}}` }}"
         ARGO_CD_URL: 'https://argocd-server.argocd.svc.cluster.local/api/v1/'
   data:
     - secretKey: ARGOCD_SESSION_TOKEN
@@ -405,37 +413,6 @@ spec:
         - transform:
             template: "POSTGRES_PASSWORD"
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gitea-credentials
-  namespace: backstage
-type: Opaque
-stringData:
-  GITEA_USERNAME: "GIT_ORG_NAME"
-  GITEA_PASSWORD: "G7DcOoBlDtzJvXKRwgoozZh0hLIcNSI1"
-# apiVersion: external-secrets.io/v1beta1
-# kind: ExternalSecret
-# metadata:
-#   name: gitea-credentials
-#   namespace: backstage
-# spec:
-#   secretStoreRef:
-#     name: gitea
-#     kind: ClusterSecretStore
-#   refreshInterval: "0"
-#   target:
-#     name: gitea-credentials
-#   data:
-#     - secretKey: GITEA_USERNAME
-#       remoteRef:
-#         key: gitea-credential
-#         property: username
-#     - secretKey: GITEA_PASSWORD
-#       remoteRef:
-#         key: gitea-credential
-#         property: password
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -444,7 +421,8 @@ metadata:
 spec:
   ingressClassName: "nginx"
   rules:
-    - http:
+    - host: {{ .Values.ingress.host | default "*" }}
+      http:
         paths:
           - path: /
             pathType: Prefix

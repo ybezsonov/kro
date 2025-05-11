@@ -1,0 +1,2 @@
+domain_name: ${DOMAIN_NAME}
+initial_root_password: ${INITIAL_ROOT_PASSWORD}

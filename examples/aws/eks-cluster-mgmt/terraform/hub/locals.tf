@@ -12,6 +12,9 @@ locals {
   region                    = data.aws_region.current.id
   cluster_version           = var.kubernetes_version
   argocd_namespace          = "argocd"
+  ingress_security_groups   = "${aws_security_group.ingress_ssh.id},${aws_security_group.ingress_http.id},${aws_security_group.ingress_https.id}"
+  ingress_nlb_domain_name   = "${data.aws_lb.ingress_nginx.dns_name}"
+  cloudfront_domain_name    = aws_cloudfront_distribution.ingress.domain_name
   gitops_addons_repo_url    = "${var.git_url}${var.git_org_name}/${var.gitops_addons_repo_name}.git"
   gitops_fleet_repo_url     = "${var.git_url}${var.git_org_name}/${var.gitops_fleet_repo_name}.git"
   gitops_workload_repo_url = "${var.git_url}${var.git_org_name}/${var.gitops_workload_repo_name}.git"
@@ -42,7 +45,7 @@ locals {
     namespace       = "ack-system"
     service_account = "ack-eks-controller"
   }
-  
+
   ec2_ack = {
     namespace       = "ack-system"
     service_account = "ack-ec2-controller"
@@ -88,15 +91,18 @@ locals {
 
   }
   oss_addons = {
+    enable_ingress_nginx                   = try(var.addons.enable_ingress_nginx, false)
     enable_argocd                          = try(var.addons.enable_argocd, false)
+    enable_backstage                       = try(var.addons.enable_backstage, false)
     enable_kargo                           = try(var.addons.enable_kargo, false)
+    enable_keycloak                        = try(var.addons.enable_keycloak, false)
+    enable_gitlab                          = try(var.addons.enable_gitlab, false)
     enable_argo_rollouts                   = try(var.addons.enable_argo_rollouts, false)
     enable_argo_events                     = try(var.addons.enable_argo_events, false)
     enable_argo_workflows                  = try(var.addons.enable_argo_workflows, false)
     enable_cluster_proportional_autoscaler = try(var.addons.enable_cluster_proportional_autoscaler, false)
     enable_gatekeeper                      = try(var.addons.enable_gatekeeper, false)
     enable_gpu_operator                    = try(var.addons.enable_gpu_operator, false)
-    enable_ingress_nginx                   = try(var.addons.enable_ingress_nginx, false)
     enable_keda                            = try(var.addons.enable_keda, false)
     enable_kyverno                         = try(var.addons.enable_kyverno, false)
     enable_kube_prometheus_stack           = try(var.addons.enable_kube_prometheus_stack, false)
@@ -168,6 +174,10 @@ locals {
       aws_load_balancer_controller_namespace       = local.aws_load_balancer_controller.namespace
       aws_load_balancer_controller_service_account = local.aws_load_balancer_controller.service_account
     },
+    {
+      ingress_security_groups = local.ingress_security_groups
+      domain_name = local.cloudfront_domain_name
+    },
 
   )
 
@@ -199,5 +209,3 @@ locals {
     GithubRepo = "github.com/gitops-bridge-dev/gitops-bridge"
   }
 }
-
-

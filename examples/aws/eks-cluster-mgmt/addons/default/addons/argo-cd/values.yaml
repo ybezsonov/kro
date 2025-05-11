@@ -7,7 +7,6 @@ global:
     eks.amazonaws.com/compute-type: auto
     kubernetes.io/os: linux
     karpenter.sh/nodepool: system
-
 server:
   autoscaling:
     enabled: true
@@ -24,22 +23,39 @@ server:
     service:
       annotations:
         prometheus.io/scrape: true
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    path: /argocd
+    pathType: Prefix
+  extraArgs:
+    - --rootpath=/argocd
+    - --basehref=/argocd
+    - --insecure
   service:
-   type: LoadBalancer
-   annotations:
-     service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
-     service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
-
+    type: ClusterIP
+  #  type: LoadBalancer
+  #  annotations:
+  #    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+  #    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
   extensions:
     enabled: true
     extensionList:
       - name: rollout-extension
         env:
           - name: EXTENSION_URL
-            value: https://github.com/argoproj-labs/rollout-extension/releases/download/v0.3.4/extension.tar
+            value: https://github.com/argoproj-labs/rollout-extension/releases/download/v0.3.7/extension.tar
 
 configs:
+  # oidc config for Keycloak
+  rbac:
+    policy.csv: |
+      g, admin, role:admin
   cm:
+    # Skip TLS verification for OIDC
+    oidc.tls.insecure.skip.verify: "true"
     controller.self.heal.timeout.seconds: "600"
     # Specifies if resource health should be persisted in app CRD (default true)
     # Changing this to `false` significantly reduce number of Application CRD updates and improves controller performance.

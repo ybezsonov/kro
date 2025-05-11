@@ -32,8 +32,13 @@ variable "addons" {
     enable_kyverno                      = true
     enable_kyverno_policies             = true
     enable_kyverno_policy_reporter      = true
+    enable_ingress_nginx                = true
     enable_argocd                       = true
+    enable_argo_workflows               = true
+    enable_backstage                    = true
     enable_kargo                        = true
+    enable_keycloak                     = true
+    enable_gitlab                       = true
     enable_cni_metrics_helper           = false
     enable_kube_state_metrics           = true
     enable_cert_manager                 = true
@@ -199,6 +204,12 @@ variable "tenant" {
   description = "Name of the tenant for the Hub Cluster"
   type        = string
   default     = "control-plane"
+}
+
+variable "ingress_name" {
+  description = "Name of the ingress controller load balancer"
+  type        = string
+  default     = "hub-ingress"
 }
 
 variable "account_ids" {

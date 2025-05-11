@@ -1,6 +1,7 @@
 vpc_name                        = "hub-cluster"
 kubernetes_version              = "1.32"
 cluster_name                    = "hub-cluster"
+ingress_name                    = "hub-ingress"
 tenant                          = "tenant1"
 
 git_url                         = "GIT_CLUSTER_MGMT_URL"
