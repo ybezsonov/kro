@@ -31,41 +31,20 @@ aws cloudformation describe-stacks --stack-name ide-stack --query "Stacks[0].Out
 
 3. Login to VSCode IDE using `IdeUrl` and `IdePassword` from the outputs above.
 
-4. Install terraform [cli](https://developer.hashicorp.com/terraform/tutorials/aws-get-started/install-cli):
-
-```sh
-sudo yum install -y yum-utils
-sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
-sudo yum -y install terraform
-```
-
-5. Get access to Gitea:
-
-```sh
-env | grep GITEA
 ```
 
 ## Walkthrough
 
 ### Configuring workspace
 
-1. Create variables
-
-Those variables should not need to be changed:
+1. Set variables
 
 ```sh
-# export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account) # Or update to the AWS account to use for your management cluster
 export KRO_REPO_URL="https://github.com/ybezsonov/kro.git"
 export KRO_REPO_BRANCH="app-promo"
 export WORKING_REPO="eks-cluster-mgmt" # If you can avoid changing this, as you'll need to update in both terraform and gitops configurations
 export TF_VAR_FILE="terraform.tfvars" # the name of terraform configuration file to use
-```
-
-Those variables can be adjusted
-
-```sh
 export MGMT_ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account) # Or update to the AWS account to use for your management cluster
-# export AWS_REGION="eu-west-2" # change to your preferred region
 export WORKSPACE_PATH="$HOME/environment" # the directory where repos will be cloned e.g. ~/environment
 export GITHUB_ORG_NAME=$GITEA_USERNAME # your Github/Gitea User-name or Organization you want to use for the work
 ```
@@ -159,9 +138,10 @@ aws eks update-kubeconfig --name hub-cluster
 5. Connect to the Argo CD UI. Execute the following command to get the Argo CD UI url and password:
 
 ```sh
-echo "ArgoCD URL: http://$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+domain_name=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
+echo "ArgoCD URL: https://$domain_name/argocd
    Login: admin
-   Password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)"
+   Password: $IDE_PASSWORD"
 ```
 
 > Wait until Argo CD Load Balancer will be provisioned and UI will be available. It should take about 3-5 minutes.
@@ -197,21 +177,7 @@ kubectl get applications -n argocd
 NAME                            SYNC STATUS   HEALTH STATUS
 ack-ec2-hub-cluster             Synced        Healthy
 ack-eks-hub-cluster             Synced        Healthy
-ack-iam-hub-cluster             Synced        Healthy
-argo-rollouts-hub-cluster       Synced        Healthy
-argocd-hub-cluster              Synced        Healthy
-bootstrap                       Synced        Healthy
-cert-manager-hub-cluster        Synced        Healthy
-cluster-addons                  Synced        Healthy
-cluster-workloads               Synced        Healthy
-clusters                        Synced        Healthy
-external-secrets-hub-cluster    Synced        Healthy
-ingress-class-alb-hub-cluster   Synced        Healthy
-kargo-hub-cluster               Synced        Healthy
-kro-eks-rgs-hub-cluster         Synced        Healthy
-kro-hub-cluster                 Synced        Healthy
-kyverno-hub-cluster             Synced        Healthy
-metrics-server-hub-cluster      Synced        Healthy
+...
 multi-acct-hub-cluster          Synced        Healthy
 ```
 
@@ -222,8 +188,6 @@ In order for the management cluster to execute actions in the spoke AWS accounts
 - `eks-cluster-mgmt-ec2`
 - `eks-cluster-mgmt-eks`
 - `eks-cluster-mgmt-iam`
-
-> If you want to only test this in the management account, you still need to do this procedure, but replacing the list of spoke accounts number by the management account number. We provided a script to help create those roles.
 
 1. Execute the script to configure IAM roles in the account. It is required for Management account:
 
