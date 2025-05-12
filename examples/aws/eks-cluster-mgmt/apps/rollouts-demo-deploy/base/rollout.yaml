@@ -44,7 +44,7 @@ spec:
     spec:
       containers:
         - name: rollouts-demo
-          image: MANAGEMENT_ACCOUNT_ID.dkr.ecr.eu-central-1.amazonaws.com/rollouts-demo
+          image: MANAGEMENT_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/rollouts-demo
           imagePullPolicy: Always
           resources:
             requests:

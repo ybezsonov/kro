@@ -10,7 +10,7 @@ COLOR=${1:-"blue"}
 pushd $WORKSPACE_PATH/$APP_NAME
 docker build --build-arg COLOR=$COLOR -t $APP_NAME:latest .
 
-ECR_URI=$(aws ecr describe-repositories --repository-names $APP_NAME | jq --raw-output '.repositories[0].repositoryUri')
+ECR_URI=$(aws ecr describe-repositories --repository-names $APP_NAME --region $AWS_REGION | jq --raw-output '.repositories[0].repositoryUri')
 echo $ECR_URI
 aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URI
 

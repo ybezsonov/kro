@@ -38,6 +38,7 @@ aws cloudformation describe-stacks --stack-name ide-stack --query "Stacks[0].Out
 1. Set variables
 
 ```sh
+env | grep GITEA
 export KRO_REPO_URL="https://github.com/ybezsonov/kro.git"
 export KRO_REPO_BRANCH="app-promo"
 export WORKING_REPO="eks-cluster-mgmt" # If you can avoid changing this, as you'll need to update in both terraform and gitops configurations
@@ -341,23 +342,7 @@ argo-rollouts-cluster-pre-prod       Synced        Healthy
 argo-rollouts-cluster-prod-eu        Synced        Healthy
 argo-rollouts-cluster-prod-us        Synced        Healthy
 argo-rollouts-cluster-test           Synced        Healthy
-argo-rollouts-hub-cluster            Synced        Healthy
-argocd-hub-cluster                   Synced        Healthy
-bootstrap                            Synced        Healthy
-cert-manager-hub-cluster             Synced        Healthy
-cluster-addons                       Synced        Healthy
-cluster-workloads                    Synced        Healthy
-clusters                             Synced        Healthy
-external-secrets-hub-cluster         Synced        Healthy
-ingress-class-alb-cluster-pre-prod   Synced        Healthy
-ingress-class-alb-cluster-prod-eu    Synced        Healthy
-ingress-class-alb-cluster-prod-us    Synced        Healthy
-ingress-class-alb-cluster-test       Synced        Healthy
-ingress-class-alb-hub-cluster        Synced        Healthy
-kargo-hub-cluster                    Synced        Healthy
-kro-eks-rgs-hub-cluster              Synced        Healthy
-kro-hub-cluster                      Synced        Healthy
-kyverno-hub-cluster                  Synced        Healthy
+...
 metrics-server-cluster-pre-prod      Synced        Healthy
 metrics-server-cluster-prod-eu       Synced        Healthy
 metrics-server-cluster-prod-us       Synced        Healthy
@@ -373,7 +358,7 @@ We will use [Argo Rollouts Demo](https://github.com/argoproj/rollouts-demo) appl
 1. Create Amazon Elastic Container Repository (Amazon ECR) for container images of the application:
 
 ```sh
-aws ecr create-repository --repository-name rollouts-demo
+aws ecr create-repository --repository-name rollouts-demo --region $AWS_REGION
 ```
 
 2. Clone the application sources repository and build an initial container image:
@@ -445,6 +430,7 @@ cp -r $WORKSPACE_PATH/$WORKING_REPO/apps/rollouts-demo-deploy/* $WORKSPACE_PATH/
 ```sh
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GIT_EXAMPLES_URL|${GITEA_EXTERNAL_URL}${GITEA_USERNAME}|g" {} +
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|MANAGEMENT_ACCOUNT_ID|${ACCOUNT_ID}|g" {} +
+find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|AWS_REGION|${AWS_REGION}|g" {} +
 
 find "$WORKSPACE_PATH/$WORKING_REPO/workloads" -type f -exec sed -i'' -e "s|GIT_EXAMPLES_URL|${GITEA_EXTERNAL_URL}${GITEA_USERNAME}|g" {} +
 ```
@@ -676,4 +662,36 @@ kubectl rollout restart deployment -n kro-system kro
 kubectl get resourcegraphdefinitions.kro.run
 kubectl rollout restart deployment -n kro-system kro
 kubectl get resourcegraphdefinitions.kro.run
+```
+
+## Available applications in the hub cluster, links and usernames/passwords.
+
+> The same password is used for all applications excepr Kargo.
+
+```sh
+domain_name=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
+echo "ArgoCD URL: https://$domain_name/argocd
+   Login: admin
+   Password: $IDE_PASSWORD
+   or using Keycloak SSO. Login user1, password $IDE_PASSWORD"
+   
+
+echo "Backstage: https://$domain_name
+   SSO Login: user1
+   Password: $IDE_PASSWORD"
+
+echo "Argo-Workflows: https://$domain_name/argo-workflows
+   SSO Login: user1
+   Password: $IDE_PASSWORD"
+
+echo "Gitlab: https://$domain_name/gitlab
+   Login: root
+   Password: $IDE_PASSWORD"
+
+echo Gitea:
+env | grep GITEA
+
+export KARGO_URL=http://$(kubectl get svc kargo-api -n kargo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "Kargo url: $KARGO_URL"
+echo "Kargo password: kargo-password"
 ```

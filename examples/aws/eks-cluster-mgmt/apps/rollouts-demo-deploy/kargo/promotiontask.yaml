@@ -10,7 +10,7 @@ spec:
   - name: branch
     value: main
   - name: image
-    value: MANAGEMENT_ACCOUNT_ID.dkr.ecr.eu-central-1.amazonaws.com/rollouts-demo
+    value: MANAGEMENT_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/rollouts-demo
   steps:
   # Clone the Git repository that contains the Kustomize configuration
   # to the ./src directory, and the environment configuration to ./out.
@@ -82,7 +82,7 @@ spec:
   - name: branch
     value: main
   - name: image
-    value: MANAGEMENT_ACCOUNT_ID.dkr.ecr.eu-central-1.amazonaws.com/rollouts-demo
+    value: MANAGEMENT_ACCOUNT_ID.dkr.ecr.AWS_REGION.amazonaws.com/rollouts-demo
   steps:
   # Clone the Git repository that contains the Kustomize configuration
   # to the ./src directory, and the environment configuration to ./out.

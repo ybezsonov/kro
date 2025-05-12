@@ -34,7 +34,7 @@ argocd:
   chartName: argo-cd
   namespace: argocd
   releaseName: argocd
-  defaultVersion: "8.0.0"
+  defaultVersion: "7.9.1"
   chartRepository: "https://argoproj.github.io/argo-helm"
   selector:
     matchExpressions:
@@ -244,7 +244,7 @@ cert_manager:
   namespace: '{{ default "cert-manager" (index .metadata.annotations "cert-manager_namespace") }}'
   chartName: cert-manager
   chartRepository: https://charts.jetstack.io
-  defaultVersion: "v1.17.0"
+  defaultVersion: "v1.15.2"
   annotationsAppSet:
     argocd.argoproj.io/sync-wave: '2'
   selector:
