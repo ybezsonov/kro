@@ -671,24 +671,24 @@ kubectl get resourcegraphdefinitions.kro.run
 ```sh
 domain_name=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
 echo "ArgoCD URL: https://$domain_name/argocd
-   Login: **admin**
+   Login: admin
    Password: $IDE_PASSWORD
-   or using Keycloak SSO. Login **user1**, password $IDE_PASSWORD"
+   or using Keycloak SSO. Login user1, password $IDE_PASSWORD"
 
 echo "Keycloak: https://$domain_name/keycloak
-   SSO Login: **admin**
+   SSO Login: admin
    Password: $IDE_PASSWORD"
 
 echo "Backstage: https://$domain_name
-   SSO Login: **user1**
+   SSO Login: user1
    Password: $IDE_PASSWORD"
 
 echo "Argo-Workflows: https://$domain_name/argo-workflows
-   SSO Login: **user1**
+   SSO Login: user1
    Password: $IDE_PASSWORD"
 
 echo "Gitlab: https://$domain_name/gitlab
-   Login: **root**
+   Login: root
    Password: $IDE_PASSWORD"
 
 echo Gitea:
