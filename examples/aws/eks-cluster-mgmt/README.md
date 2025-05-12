@@ -31,8 +31,6 @@ aws cloudformation describe-stacks --stack-name ide-stack --query "Stacks[0].Out
 
 3. Login to VSCode IDE using `IdeUrl` and `IdePassword` from the outputs above.
 
-```
-
 ## Walkthrough
 
 ### Configuring workspace
