@@ -676,7 +676,7 @@ echo "ArgoCD URL: https://$domain_name/argocd
    or using Keycloak SSO. Login user1, password $IDE_PASSWORD"
 
 echo "Keycloak: https://$domain_name/keycloak
-   SSO Login: admin
+   Login: admin
    Password: $IDE_PASSWORD"
 
 echo "Backstage: https://$domain_name
