@@ -666,7 +666,7 @@ kubectl get resourcegraphdefinitions.kro.run
 
 ## Available applications in the hub cluster, links and usernames/passwords.
 
-> The same password is used for all applications excepr Kargo.
+> The same password is used for all applications except Kargo.
 
 ```sh
 domain_name=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
