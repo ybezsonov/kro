@@ -177,6 +177,7 @@ locals {
     {
       ingress_security_groups = local.ingress_security_groups
       domain_name = local.cloudfront_domain_name
+      ide_password = data.external.env_vars.result.IDE_PASSWORD
     },
 
   )
