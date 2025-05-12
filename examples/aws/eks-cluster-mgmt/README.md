@@ -187,7 +187,7 @@ In order for the management cluster to execute actions in the spoke AWS accounts
 - `eks-cluster-mgmt-eks`
 - `eks-cluster-mgmt-iam`
 
-1. Execute the script to configure IAM roles in the account. It is required for Management account:
+1. Execute the script to configure IAM roles in the account. It is **required** for Management account:
 
 ```sh
 cd $WORKSPACE_PATH/$WORKING_REPO/scripts
