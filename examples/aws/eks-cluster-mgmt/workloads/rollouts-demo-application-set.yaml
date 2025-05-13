@@ -6,7 +6,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: GIT_EXAMPLES_URL/rollouts-demo-deploy.git
+        repoURL: GITLAB_URL/GIT_USERNAME/rollouts-demo-deploy.git
         revision: HEAD
         directories:
           - path: env/*
@@ -22,7 +22,7 @@ spec:
         namespace: 'rollouts-demo'
       source:
         path: './'
-        repoURL: GIT_EXAMPLES_URL/rollouts-demo-deploy.git
+        repoURL: GITLAB_URL/GIT_USERNAME/rollouts-demo-deploy.git
         targetRevision: 'env/{{path.basename}}'
       syncPolicy:
         automated:

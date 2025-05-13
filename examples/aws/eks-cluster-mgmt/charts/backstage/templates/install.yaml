@@ -107,10 +107,19 @@ data:
 
     integrations:
       gitlab:
-        - baseUrl: ${GIT_URL}
-          host: ${DOMAIN_NAME}
-          username: ${GIT_USERNAME}
-          password: ${GIT_PASSWORD}
+        - token: ${GIT_PASSWORD}
+          apiBaseUrl: ${GIT_URL}
+          baseUrl: ${GIT_URL}
+          host: {{ .Values.ingress.host }}
+    #  gitea:
+    #   - baseUrl: https://cnoe.localtest.me:8443/gitea
+    #     host: cnoe.localtest.me:8443
+    #     username: ${GITEA_USERNAME}
+    #     password: ${GITEA_PASSWORD}
+    #   - baseUrl: https://cnoe.localtest.me/gitea
+    #     host: cnoe.localtest.me
+    #     username: ${GITEA_USERNAME}
+    #     password: ${GITEA_PASSWORD}
     #  github:
     #    - host: github.com
     #      apps:

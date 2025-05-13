@@ -122,10 +122,10 @@ echo "ArgoCD URL: https://$DOMAIN_NAME/argocd
 
 ```sh
 export GITLAB_URL=https://$DOMAIN_NAME/gitlab
+export NLB_DNS=$(aws elbv2 describe-load-balancers --region eu-central-1 --names hub-ingress --query 'LoadBalancers[0].DNSName' --output text)
 $WORKSPACE_PATH/$WORKING_REPO/scripts/gitlab/create_gitlab_repos.sh
 
 cd $WORKSPACE_PATH/$WORKING_REPO
-export NLB_DNS=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?starts_with(LoadBalancerName, 'hub-ingress')].LoadBalancerArn" --output text)
 git remote add origin ssh://git@$NLB_DNS/$GIT_USERNAME/$WORKING_REPO.git
 
 git push --set-upstream origin main
@@ -245,7 +245,7 @@ git push
 
 ```sh
 sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$MGMT_ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
-sed -i 's/GITLAB_URL/'"$GITLAB_URL"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+sed -i 's|GITLAB_URL|'"$GITLAB_URL"'|g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 sed -i 's/GIT_USERNAME/'"$GIT_USERNAME"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 sed -i 's/WORKING_REPO/'"$WORKING_REPO"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 
@@ -412,6 +412,9 @@ find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GITLAB_
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GIT_USERNAME|${GIT_USERNAME}|g" {} +
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|MANAGEMENT_ACCOUNT_ID|${MGMT_ACCOUNT_ID}|g" {} +
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|AWS_REGION|${AWS_REGION}|g" {} +
+
+find "$WORKSPACE_PATH/$WORKING_REPO/workloads" -type f -exec sed -i'' -e "s|GITLAB_URL|${GITLAB_URL}|g" {} +
+find "$WORKSPACE_PATH/$WORKING_REPO/workloads" -type f -exec sed -i'' -e "s|GIT_USERNAME|${GIT_USERNAME}|g" {} +
 ```
 
 5. Enable `workloads` in Argo CD application:
@@ -438,7 +441,7 @@ metadata:
    labels:
       argocd.argoproj.io/secret-type: repository
 stringData:
-   url: ${GITLAB_URL}${GIT_USERNAME}/rollouts-demo-deploy.git
+   url: ${GITLAB_URL}/${GIT_USERNAME}/rollouts-demo-deploy.git
    type: git
    username: $GIT_USERNAME
    password: $IDE_PASSWORD
@@ -487,7 +490,7 @@ metadata:
    labels:
       kargo.akuity.io/cred-type: git
 stringData:
-   repoURL:  ${GITLAB_URL}${GIT_USERNAME}/rollouts-demo-deploy.git
+   repoURL:  ${GITLAB_URL}/${GIT_USERNAME}/rollouts-demo-deploy.git
    username: $GIT_USERNAME
    password: $IDE_PASSWORD
 EOF

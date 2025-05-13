@@ -10,7 +10,7 @@ spec:
   project: default
   source:
     path: ./kargo
-    repoURL: GIT_EXAMPLES_URL/rollouts-demo-deploy.git
+    repoURL: GITLAB_URL/GIT_USERNAME/rollouts-demo-deploy.git
   syncPolicy:
     automated:
       prune: true
