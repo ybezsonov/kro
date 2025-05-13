@@ -6,7 +6,7 @@ metadata:
 spec:
   vars:
   - name: repoURL
-    value: GIT_EXAMPLES_URL/rollouts-demo-deploy.git
+    value: GITLAB_URL/GIT_USERNAME/rollouts-demo-deploy.git
   - name: branch
     value: main
   - name: image
@@ -78,7 +78,7 @@ metadata:
 spec:
   vars:
   - name: repoURL
-    value: GIT_EXAMPLES_URL/rollouts-demo-deploy.git
+    value: GITLAB_URL/GIT_USERNAME/rollouts-demo-deploy.git
   - name: branch
     value: main
   - name: image
@@ -138,7 +138,7 @@ spec:
     as: open-pr
     config:
       repoURL: ${{ vars.repoURL }}
-      provider: gitea
+      provider: gitlab
       # insecureSkipTLSVerify: true
       createTargetBranch: true
       sourceBranch: ${{ task.outputs['push'].branch }}
@@ -148,7 +148,7 @@ spec:
     as: wait-for-pr
     config:
       repoURL: ${{ vars.repoURL }}
-      provider: gitea
+      provider: gitlab
       # insecureSkipTLSVerify: true
       prNumber: ${{ task.outputs['open-pr'].prNumber }}
   # Request a sync of the ArgoCD Application to apply the changes from the

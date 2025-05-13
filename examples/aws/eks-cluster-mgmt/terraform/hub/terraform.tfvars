@@ -4,8 +4,8 @@ cluster_name                    = "hub-cluster"
 ingress_name                    = "hub-ingress"
 tenant                          = "tenant1"
 
-git_url                         = "GIT_CLUSTER_MGMT_URL"
-git_org_name                    = "GIT_ORG_NAME"
+git_url                         = ""
+git_org_name                    = "user1"
 
 gitops_addons_repo_name         = "eks-cluster-mgmt"
 gitops_addons_repo_base_path    = "addons/"

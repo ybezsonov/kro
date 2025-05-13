@@ -19,5 +19,5 @@ data "aws_iam_session_context" "current" {
 
 # External data source to read environment variables
 data "external" "env_vars" {
-  program = ["bash", "-c", "echo '{\"IDE_PASSWORD\":\"'\"$IDE_PASSWORD\"'\", \"GITEA_EXTERNAL_URL\":\"'\"$GITEA_EXTERNAL_URL\"'\", \"GITEA_USERNAME\":\"'\"$GITEA_USERNAME\"'\", \"GITEA_PASSWORD\":\"'\"$GITEA_PASSWORD\"'\"}'"]
+  program = ["bash", "-c", "echo '{\"IDE_PASSWORD\":\"'\"$IDE_PASSWORD\"'\"}'"]
 }

@@ -15,10 +15,10 @@ bootstrapping workload clusters (spokes) are installed on top.
 
 1. AWS account for the management cluster, and optional AWS accounts for spoke clusters (you can reuse management account for spoke too).
 
-2. Deploy VSCode IDE. In additional to IDE it gives you pre-deployed Git Server with [Gitea](https://about.gitea.com/) for GitOps:
+2. Deploy VSCode IDE:
 
 ```sh
-curl https://raw.githubusercontent.com/aws-samples/java-on-aws/main/infrastructure/cfn/ide-gitea-stack.yaml > ide-stack.yaml
+curl https://raw.githubusercontent.com/aws-samples/java-on-aws/main/infrastructure/cfn/ide-stack.yaml > ide-stack.yaml
 CFN_S3=cfn-$(uuidgen | tr -d - | tr '[:upper:]' '[:lower:]')
 aws s3 mb s3://$CFN_S3
 aws cloudformation deploy --stack-name ide-stack \
@@ -38,62 +38,36 @@ aws cloudformation describe-stacks --stack-name ide-stack --query "Stacks[0].Out
 1. Set variables
 
 ```sh
-env | grep GITEA
 export KRO_REPO_URL="https://github.com/ybezsonov/kro.git"
 export KRO_REPO_BRANCH="app-promo"
 export WORKING_REPO="eks-cluster-mgmt" # If you can avoid changing this, as you'll need to update in both terraform and gitops configurations
 export TF_VAR_FILE="terraform.tfvars" # the name of terraform configuration file to use
 export MGMT_ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account) # Or update to the AWS account to use for your management cluster
 export WORKSPACE_PATH="$HOME/environment" # the directory where repos will be cloned e.g. ~/environment
-export GITHUB_ORG_NAME=$GITEA_USERNAME # your Github/Gitea User-name or Organization you want to use for the work
+export GIT_USERNAME=user1
 ```
 
-2. Clone kro repository:
+2. Clone `kro` repository:
 
 ```sh
 git clone $KRO_REPO_URL $WORKSPACE_PATH/kro
 git -C $WORKSPACE_PATH/kro checkout $KRO_REPO_BRANCH
 ```
 
-3. Create `eks-cluster-mgmt` GitOps repository:
+3. Create `eks-cluster-mgmt` Git repository:
 
 ```sh
-curl -X 'POST' \
-   "http://$GITEA_USERNAME:$IDE_PASSWORD@localhost:9000/api/v1/user/repos" \
-   -H 'accept: application/json' \
-   -H 'Content-Type: application/json' \
-   -d "{
-      \"name\": \"${WORKING_REPO}\"
-   }"
-```
+mkdir $WORKSPACE_PATH/$WORKING_REPO
+cd $WORKSPACE_PATH/$WORKING_REPO
+git config --global user.email "$GIT_USERNAME@example.com"
+git config --global user.name "$GIT_USERNAME"
 
-4. Clone the working empty git repository:
+git init -b main
 
-```sh
-git clone ssh://git@$GIT_SSH_ENDPOINT/$GITEA_USERNAME/$WORKING_REPO.git $WORKSPACE_PATH/$WORKING_REPO
-```
-
-5. Populate the repository:
-
-```sh
 cp -r $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/* $WORKSPACE_PATH/$WORKING_REPO/
-```
 
-6. Replace Git Urls in the project:
-
-```sh
-find "$WORKSPACE_PATH/$WORKING_REPO/" -type f -exec sed -i'' -e "s|GIT_CLUSTER_MGMT_URL|${GITEA_EXTERNAL_URL}|g" {} +
-find "$WORKSPACE_PATH/$WORKING_REPO/" -type f -exec sed -i'' -e "s|GIT_ORG_NAME|${GITEA_USERNAME}|g" {} +
-```
-
-7. Add, Commit and Push:
-
-```sh
-cd $WORKSPACE_PATH/$WORKING_REPO/
-git status
 git add .
-git commit -m "initial commit"
-git push
+git commit -q -m "initial commit"
 ```
 
 ### Creating the Management cluster
@@ -107,14 +81,13 @@ sed -i "s|account_ids = \".*\"|account_ids = \"$MGMT_ACCOUNT_ID\"|" "$WORKSPACE_
 code $WORKSPACE_PATH/$WORKING_REPO/terraform/hub/terraform.tfvars
 ```
 
-2. Add, Commit and Push:
+2. Add and Commit:
 
 ```sh
 cd $WORKSPACE_PATH/$WORKING_REPO/
 git status
 git add .
 git commit -m "Terraform values"
-git push
 ```
 
 3. Apply the terraform to create the management cluster:
@@ -137,17 +110,26 @@ aws eks update-kubeconfig --name hub-cluster
 5. Connect to the Argo CD UI. Execute the following command to get the Argo CD UI url and password:
 
 ```sh
-domain_name=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
-echo "ArgoCD URL: https://$domain_name/argocd
+export DOMAIN_NAME=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
+echo "ArgoCD URL: https://$DOMAIN_NAME/argocd
    Login: admin
    Password: $IDE_PASSWORD"
 ```
 
 > Wait until Argo CD Load Balancer will be provisioned and UI will be available. It should take about 3-5 minutes.
 
-6. Create secret with Gitea token for Argo CD to access the GitOps repository:
+6. Create Gitlab Git repository and secret for Argo CD to access the Git repository:
 
 ```sh
+export GITLAB_URL=https://$DOMAIN_NAME/gitlab
+$WORKSPACE_PATH/$WORKING_REPO/scripts/gitlab/create_gitlab_repos.sh
+
+cd $WORKSPACE_PATH/$WORKING_REPO
+export NLB_DNS=$(aws elbv2 describe-load-balancers --query "LoadBalancers[?starts_with(LoadBalancerName, 'hub-ingress')].LoadBalancerArn" --output text)
+git remote add origin ssh://git@$NLB_DNS/$GIT_USERNAME/$WORKING_REPO.git
+
+git push --set-upstream origin main
+
 envsubst << 'EOF' | kubectl apply -f -
 apiVersion: v1
 kind: Secret
@@ -157,10 +139,10 @@ metadata:
    labels:
       argocd.argoproj.io/secret-type: repository
 stringData:
-   url: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/${WORKING_REPO}.git
+   url: ${GITLAB_URL}/${GIT_USERNAME}/${WORKING_REPO}.git
    type: git
+   username: $GIT_USERNAME
    password: $IDE_PASSWORD
-   username: $GITEA_USERNAME
 EOF
 ```
 
@@ -204,13 +186,7 @@ If you want to add spoke accounts, you need to connect to your AWS spoke account
 
 ### Checking kro resources
 
-1. Restart kro to take into account new ACK CRD deployed by ArgoCD
-
-```sh
-kubectl rollout restart deployment -n kro-system kro
-```
-
-2. Check that the Resource Graph Definitions (RGD) are properly reconciled and active:
+1. Check that the Resource Graph Definitions (RGD) are properly reconciled and active:
 
 ```sh
 kubectl get resourcegraphdefinitions.kro.run
@@ -225,7 +201,7 @@ eksclusterwithvpc.kro.run   v1alpha1     EksclusterWithVpc   Active   12m
 vpc.kro.run                 v1alpha1     Vpc                 Active   13m
 ```
 
-3. If some of the RGD are not active, restart kro again and check:
+3. If some of the RGD are not active, restart kro again and check **until all RGDs** are `Active`:
 
 ```sh
 kubectl rollout restart deployment -n kro-system kro
@@ -247,7 +223,7 @@ If you just want to only use one account, you still need to specify the AWS acco
 We use management account ID to deploy `test`, `pre-prod`, `prod-eu` and `prod-us` clusters:
 
 ```sh
-sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml"
+sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$MGMT_ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml"
 code $WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml
 ```
 
@@ -268,7 +244,11 @@ git push
 4. Update cluster definitions with Management account ID:
 
 ```sh
-sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$MGMT_ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+sed -i 's/GITLAB_URL/'"$GITLAB_URL"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+sed -i 's/GIT_USERNAME/'"$GIT_USERNAME"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+sed -i 's/WORKING_REPO/'"$WORKING_REPO"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+
 code $WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml
 ```
 > Uncomment cluster-* in the file.
@@ -398,7 +378,7 @@ aws iam attach-role-policy --no-cli-pager \
   --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
 aws eks create-pod-identity-association \
   --cluster-name hub-cluster \
-  --role-arn arn:aws:iam::$ACCOUNT_ID:role/kargo-controller-role \
+  --role-arn arn:aws:iam::$MGMT_ACCOUNT_ID:role/kargo-controller-role \
   --namespace kargo \
   --service-account kargo-controller
 rm trust-policy.json
@@ -409,30 +389,29 @@ rm trust-policy.json
 1. Create Git repository for the application deployment configuration:
 
 ```sh
-curl -X 'POST' \
-   "http://$GITEA_USERNAME:$IDE_PASSWORD@localhost:9000/api/v1/user/repos" \
-   -H 'accept: application/json' \
-   -H 'Content-Type: application/json' \
-   -d "{
-      \"name\": \"rollouts-demo-deploy\"
-   }"
+curl -Ss -X 'POST' "$GITLAB_URL/api/v4/projects/" \
+  -H "PRIVATE-TOKEN: $IDE_PASSWORD" \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d "{
+  \"name\": \"rollouts-demo-deploy\"
+}" && echo -e "\n"
 ```
 
 2. Clone and populate the deployment Git repository:
 
 ```sh
-git clone ssh://git@$GIT_SSH_ENDPOINT/$GITEA_USERNAME/rollouts-demo-deploy.git $WORKSPACE_PATH/rollouts-demo-deploy
+git clone ssh://git@$NLB_DNS/$GIT_USERNAME/rollouts-demo-deploy.git $WORKSPACE_PATH/rollouts-demo-deploy
 cp -r $WORKSPACE_PATH/$WORKING_REPO/apps/rollouts-demo-deploy/* $WORKSPACE_PATH/rollouts-demo-deploy/
 ```
 
 4. Update Account ID in ECR Urls and repoUrl in the application configuration for Kargo:
 
 ```sh
-find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GIT_EXAMPLES_URL|${GITEA_EXTERNAL_URL}${GITEA_USERNAME}|g" {} +
-find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|MANAGEMENT_ACCOUNT_ID|${ACCOUNT_ID}|g" {} +
+find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GITLAB_URL|${GITLAB_URL}|g" {} +
+find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GIT_USERNAME|${GIT_USERNAME}|g" {} +
+find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|MANAGEMENT_ACCOUNT_ID|${MGMT_ACCOUNT_ID}|g" {} +
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|AWS_REGION|${AWS_REGION}|g" {} +
-
-find "$WORKSPACE_PATH/$WORKING_REPO/workloads" -type f -exec sed -i'' -e "s|GIT_EXAMPLES_URL|${GITEA_EXTERNAL_URL}${GITEA_USERNAME}|g" {} +
 ```
 
 5. Enable `workloads` in Argo CD application:
@@ -459,10 +438,10 @@ metadata:
    labels:
       argocd.argoproj.io/secret-type: repository
 stringData:
-   url: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/rollouts-demo-deploy.git
+   url: ${GITLAB_URL}${GIT_USERNAME}/rollouts-demo-deploy.git
    type: git
+   username: $GIT_USERNAME
    password: $IDE_PASSWORD
-   username: $GITEA_USERNAME
 EOF
 ```
 
@@ -508,9 +487,9 @@ metadata:
    labels:
       kargo.akuity.io/cred-type: git
 stringData:
-   repoURL:  ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/rollouts-demo-deploy.git
+   repoURL:  ${GITLAB_URL}${GIT_USERNAME}/rollouts-demo-deploy.git
+   username: $GIT_USERNAME
    password: $IDE_PASSWORD
-   username: $GITEA_USERNAME
 EOF
 
 kubectl -n kargo rollout restart deploy kargo-controller
@@ -535,23 +514,6 @@ $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh
 ```sh
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh green
 ```
-
-<!-- ```sh
-envsubst << 'EOF' | kubectl apply -f -
-apiVersion: v1
-kind: Secret
-metadata:
-   name: git-workloads-infra-kargo
-   namespace: workloads-infra-kargo
-   labels:
-      kargo.akuity.io/cred-type: git
-stringData:
-   repoURL: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/${WORKING_REPO}.git
-   password: $IDE_PASSWORD
-   username: $GITEA_USERNAME
-EOF
-kubectl -n kargo rollout restart deploy kargo-controller
-``` -->
 
 ![Kargo continuous promotion](docs/kargo-promotion.png)
 
@@ -689,10 +651,9 @@ echo "Argo-Workflows: https://$domain_name/argo-workflows
 
 echo "Gitlab: https://$domain_name/gitlab
    Login: root
+   Password: $IDE_PASSWORD
+   Login: user1
    Password: $IDE_PASSWORD"
-
-echo Gitea:
-env | grep GITEA
 
 export KARGO_URL=http://$(kubectl get svc kargo-api -n kargo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 echo "Kargo url: $KARGO_URL"

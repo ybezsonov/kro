@@ -11,7 +11,7 @@ spec:
       imageSelectionStrategy: Lexical
       allowTags: ^i\d{14}$
   - git:
-      repoURL: GIT_EXAMPLES_URL/rollouts-demo-deploy.git
+      repoURL: GITLAB_URL/GIT_USERNAME/rollouts-demo-deploy.git
       # insecureSkipTLSVerify: true
       branch: main
       includePaths:

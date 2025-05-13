@@ -74,7 +74,7 @@ variable "route53_zone_name" {
 
 variable "git_url" {
   description = "The Url of Git server"
-  default     = "https://github.com/"
+  default     = ""
 }
 
 variable "git_org_name" {

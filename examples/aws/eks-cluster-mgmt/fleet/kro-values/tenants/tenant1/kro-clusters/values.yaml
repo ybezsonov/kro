@@ -7,10 +7,10 @@ clusters:
   #   region: "eu-central-1"
   #   k8sVersion: "1.31"
   #   gitops:
-  #     addonsRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     fleetRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     platformRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     workloadRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
+  #     addonsRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     fleetRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     platformRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     workloadRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
   #   addons:
   #     enable_ingress_class_alb: "true"
   #     enable_argo_rollouts: "true"
@@ -31,10 +31,10 @@ clusters:
   #   region: "us-west-2"
   #   k8sVersion: "1.31"
   #   gitops:
-  #     addonsRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     fleetRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     platformRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     workloadRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
+  #     addonsRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     fleetRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     platformRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     workloadRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
   #   addons:
   #     enable_ingress_class_alb: "true"
   #     enable_argo_rollouts: "true"
@@ -55,10 +55,10 @@ clusters:
   #   region: "us-west-2"
   #   k8sVersion: "1.31"
   #   gitops:
-  #     addonsRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     fleetRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     platformRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     workloadRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
+  #     addonsRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     fleetRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     platformRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     workloadRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
   #   addons:
   #     enable_ingress_class_alb: "true"
   #     enable_argo_rollouts: "true"
@@ -79,10 +79,10 @@ clusters:
   #   region: "eu-west-1"
   #   k8sVersion: "1.31"
   #   gitops:
-  #     addonsRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     fleetRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     platformRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
-  #     workloadRepoUrl: "GIT_CLUSTER_MGMT_URLGIT_ORG_NAME/eks-cluster-mgmt"
+  #     addonsRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     fleetRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     platformRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
+  #     workloadRepoUrl: "GITLAB_URL/GIT_USERNAME/WORKING_REPO.git"
   #   addons:
   #     enable_ingress_class_alb: "true"
   #     enable_argo_rollouts: "true"
@@ -103,10 +103,10 @@ clusters:
   #   tenant: "tenant1"
   #   k8sVersion: "1.30"
   #   gitops:
-  #     addonsRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
-  #     fleetRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
-  #     platformRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
-  #     workloadRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
+  #     addonsRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
+  #     fleetRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
+  #     platformRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
+  #     workloadRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
 
   # workload-cluster2:
   #   managementAccountId: "XXXXXX"
@@ -115,10 +115,10 @@ clusters:
   #   k8sVersion: "1.30"
   #   domainName: "workload-cluster2.mydomain.com"
   #   gitops:
-  #     addonsRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
-  #     fleetRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
-  #     platformRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
-  #     workloadRepoUrl: "https://github.com/XXXXXX/eks-cluster-mgmt"
+  #     addonsRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
+  #     fleetRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
+  #     platformRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
+  #     workloadRepoUrl: "https://github.com/XXXXXX/WORKING_REPO.git"
   #     addonsRepoRevision: "main"
   #     fleetRepoRevision: "main"
   #     platformRepoRevision: "main"

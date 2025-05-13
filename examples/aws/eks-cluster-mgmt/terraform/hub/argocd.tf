@@ -85,19 +85,19 @@ resource "kubernetes_secret" "ide_password" {
   }
 }
 
-# Create Gitea credentials secret in ArgoCD namespace
-resource "kubernetes_secret" "gitea_credentials" {
+# Create Git credentials secret in ArgoCD namespace
+resource "kubernetes_secret" "git_credentials" {
   depends_on = [kubernetes_namespace.argocd]
 
   metadata {
-    name      = "gitea-credentials"
+    name      = "git-credentials"
     namespace = "argocd"
   }
 
   data = {
-    GITEA_EXTERNAL_URL = data.external.env_vars.result.GITEA_EXTERNAL_URL
-    GITEA_USERNAME     = data.external.env_vars.result.GITEA_USERNAME
-    GITEA_PASSWORD     = data.external.env_vars.result.GITEA_PASSWORD
+    GIT_URL      = ${local.git_url_gitlab}
+    GIT_USERNAME = ${var.git_org_name}
+    GIT_PASSWORD = data.external.env_vars.result.IDE_PASSWORD
   }
 }
 

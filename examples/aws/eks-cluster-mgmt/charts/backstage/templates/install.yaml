@@ -106,11 +106,11 @@ data:
       # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
     integrations:
-      gitea:
-        - baseUrl: ${GITEA_EXTERNAL_URL}
+      gitlab:
+        - baseUrl: ${GIT_URL}
           host: ${DOMAIN_NAME}
-          username: ${GITEA_USERNAME}
-          password: ${GITEA_PASSWORD}
+          username: ${GIT_USERNAME}
+          password: ${GIT_PASSWORD}
     #  github:
     #    - host: github.com
     #      apps:
@@ -168,7 +168,7 @@ data:
       locations:
         # Examples from a public GitHub repository.
         - type: url
-          target: ${GITEA_EXTERNAL_URL}${GITEA_USERNAME}/idpbuilder-localdev-backstage-templates-entities/raw/branch/main/catalog-info.yaml
+          target: ${GIT_URL}${GIT_USERNAME}/idpbuilder-localdev-backstage-templates-entities/raw/branch/main/catalog-info.yaml
           rules:
             - allow: [Component, System, API, Resource, Location, Template, User, Group]
     kubernetes:
@@ -267,7 +267,7 @@ spec:
             - secretRef:
                 name: backstage-env-vars
             - secretRef:
-                name: gitea-credentials
+                name: git-credentials
             - secretRef:
                 name: argocd-credentials
           image: ghcr.io/cnoe-io/backstage-app:135c0cb26f3e004a27a11edb6a4779035aff9805
