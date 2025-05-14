@@ -242,3 +242,42 @@ resource "aws_eks_pod_identity_association" "ack_controller" {
   service_account = "ack-${each.key}-controller"
   role_arn        = aws_iam_role.ack_controller[each.key].arn
 }
+
+################################################################################
+# Kargo ECR Access
+################################################################################
+
+resource "aws_iam_role" "kargo_controller_role" {
+  name = "kargo-controller-role"
+  
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "pods.eks.amazonaws.com"
+        }
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
+      }
+    ]
+  })
+  
+  description = "IAM role for Kargo to access Amazon ECR"
+  tags        = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "kargo_ecr_policy" {
+  role       = aws_iam_role.kargo_controller_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+}
+
+resource "aws_eks_pod_identity_association" "kargo_controller" {
+  cluster_name    = local.cluster_info.cluster_name
+  namespace       = "kargo"
+  service_account = "kargo-controller"
+  role_arn        = aws_iam_role.kargo_controller_role.arn
+}

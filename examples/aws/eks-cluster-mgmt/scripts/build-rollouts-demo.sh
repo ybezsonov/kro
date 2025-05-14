@@ -1,5 +1,8 @@
 APP_NAME=${2:-"rollouts-demo"}
 COLOR=${1:-"blue"}
+
+set -x
+
 # "red",
 # "orange",
 # "yellow",

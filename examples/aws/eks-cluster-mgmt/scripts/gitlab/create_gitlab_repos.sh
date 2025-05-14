@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 # SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # export DOMAIN_NAME=$($SCRIPT_DIR/get_cloudfront.sh)
 # export NLB_DNS=$($SCRIPT_DIR/get_nlb.sh)
