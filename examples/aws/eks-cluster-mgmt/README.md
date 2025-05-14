@@ -70,6 +70,19 @@ git add .
 git commit -q -m "initial commit"
 ```
 
+4. Install Argo CD cli # TODO: move to bootstrap.sh script
+
+```sh
+# Download the latest Argo CD CLI
+curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+
+# Make the binary executable
+chmod +x argocd-linux-amd64
+
+# Move the binary to a directory in your PATH
+sudo mv argocd-linux-amd64 /usr/local/bin/argocd
+```
+
 ### Creating the Management cluster
 
 1. Update the `terraform.tfvars` with your values:
@@ -122,7 +135,7 @@ echo "ArgoCD URL: https://$DOMAIN_NAME/argocd
 
 ```sh
 export GITLAB_URL=https://$DOMAIN_NAME/gitlab
-export NLB_DNS=$(aws elbv2 describe-load-balancers --region eu-central-1 --names hub-ingress --query 'LoadBalancers[0].DNSName' --output text)
+export NLB_DNS=$(aws elbv2 describe-load-balancers --region $AWS_REGION --names hub-ingress --query 'LoadBalancers[0].DNSName' --output text)
 $WORKSPACE_PATH/$WORKING_REPO/scripts/gitlab/create_gitlab_repos.sh
 
 cd $WORKSPACE_PATH/$WORKING_REPO
@@ -149,6 +162,14 @@ EOF
 7. Login to Argo CD UI and Refresh `bootstrap` Argo CD application.
 
 > Wait until all Argo CD applications will be deployed successfully.
+
+```bash
+# Login to ArgoCD CLI 
+argocd login --username admin --password $IDE_PASSWORD --grpc-web-root-path /argocd $DOMAIN_NAME
+
+#List apps
+argocd app list
+```
 
 ```sh
 kubectl get applications -n argocd
@@ -240,6 +261,14 @@ git push
 ```
 
 3. Refresh `multi-acct-hub-cluster` Argo CD application to create namespaces for clusters.
+
+```sh
+# Sync the cluster-workloads application (if needed)
+argocd app sync multi-acct-hub-cluster
+
+# Wait for the rollouts-demo-kargo application to be synced and healthy
+argocd app wait multi-acct-hub-cluster --health --sync
+```
 
 4. Update cluster definitions with Management account ID:
 
@@ -349,39 +378,11 @@ git clone https://github.com/argoproj/rollouts-demo.git
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh
 ```
 
-3. We already deployed Kargo to the Hub cluster. Create IAM role for Kargo to access Amazon ECR:
+3. We already deployed Kargo to the Hub cluster, and use of EKS Pod Identity for authentication
 
+Check the EKS Pod Identity association
 ```sh
-cat << EOF > trust-policy.json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "pods.eks.amazonaws.com"
-      },
-      "Action": [
-        "sts:AssumeRole",
-        "sts:TagSession"
-      ]
-    }
-  ]
-}
-EOF
-
-aws iam create-role --no-cli-pager \
-  --role-name kargo-controller-role \
-  --assume-role-policy-document file://trust-policy.json --
-aws iam attach-role-policy --no-cli-pager \
-  --role-name kargo-controller-role \
-  --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser
-aws eks create-pod-identity-association \
-  --cluster-name hub-cluster \
-  --role-arn arn:aws:iam::$MGMT_ACCOUNT_ID:role/kargo-controller-role \
-  --namespace kargo \
-  --service-account kargo-controller
-rm trust-policy.json
+aws eks list-pod-identity-associations --cluster-name hub-cluster | grep -A 3 "kargo-controller"
 ```
 
 ### Onboarding a workload example application with continuous promotion.
@@ -466,7 +467,19 @@ git push
 
 7. Login to Argo CD UI and Refresh `cluster-workloads` application. Wait until `rollouts-demo-kargo` Argo CD application synced and ready.
 
-### Accessing Karo and working with promotions.
+```sh
+# Login to ArgoCD CLI (replace with your ArgoCD server URL)
+argocd login --username admin --password $IDE_PASSWORD --grpc-web-root-path /argocd $DOMAIN_NAME
+
+
+# Sync the cluster-workloads application (if needed)
+argocd app sync cluster-workloads
+
+# Wait for the rollouts-demo-kargo application to be synced and healthy
+argocd app wait rollouts-demo-kargo --health --sync
+```
+
+### Accessing Kargo and working with promotions.
 
 1. Access Kargo UI:
 
@@ -498,7 +511,7 @@ EOF
 kubectl -n kargo rollout restart deploy kargo-controller
 ```
 
-3. Wait until `rollouts-demo-*` ArgoCD Applications are fully operational and test them.
+3. Wait until `rollouts-demo-kargo` ArgoCD Application is fully operational.
 
 4. Build a new container images and observe deployment, continuous promotion from `test` to `prep-prod` and rollouts:
 
@@ -634,25 +647,25 @@ kubectl get resourcegraphdefinitions.kro.run
 > The same password is used for all applications except Kargo.
 
 ```sh
-domain_name=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
-echo "ArgoCD URL: https://$domain_name/argocd
+DOMAIN_NAME=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'http-origin')].DomainName | [0]" --output text)
+echo "ArgoCD URL: https://$DOMAIN_NAME/argocd
    Login: admin
    Password: $IDE_PASSWORD
    or using Keycloak SSO. Login user1, password $IDE_PASSWORD"
 
-echo "Keycloak: https://$domain_name/keycloak
+echo "Keycloak: https://$DOMAIN_NAME/keycloak
    Login: admin
    Password: $IDE_PASSWORD"
 
-echo "Backstage: https://$domain_name
+echo "Backstage: https://$DOMAIN_NAME
    SSO Login: user1
    Password: $IDE_PASSWORD"
 
-echo "Argo-Workflows: https://$domain_name/argo-workflows
+echo "Argo-Workflows: https://$DOMAIN_NAME/argo-workflows
    SSO Login: user1
    Password: $IDE_PASSWORD"
 
-echo "Gitlab: https://$domain_name/gitlab
+echo "Gitlab: https://$DOMAIN_NAME/gitlab
    Login: root
    Password: $IDE_PASSWORD
    Login: user1
