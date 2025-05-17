@@ -20,32 +20,6 @@ data "aws_ec2_managed_prefix_list" "cloudfront" {
   name = "com.amazonaws.global.cloudfront.origin-facing"
 }
 
-# Security group for SSH access (port 22) from anywhere
-resource "aws_security_group" "ingress_ssh" {
-  name        = "${var.ingress_name}-ssh"
-  description = "SSH from anywhere"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress {
-    description = "SSH from anywhere"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.ingress_name}-ssh"
-  }
-}
-
 # Security group for HTTP access (port 80) from CloudFront
 resource "aws_security_group" "ingress_http" {
   name        = "${var.ingress_name}-http"
@@ -119,7 +93,6 @@ locals {
 resource "helm_release" "ingress_nginx" {
   depends_on = [
     kubernetes_namespace.ingress_nginx,
-    aws_security_group.ingress_ssh,
     aws_security_group.ingress_http,
     aws_security_group.ingress_https
   ]

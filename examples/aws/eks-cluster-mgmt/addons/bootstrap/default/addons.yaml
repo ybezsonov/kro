@@ -43,13 +43,13 @@ argocd:
         values: ['true']
   valuesObject:
     global:
-      domain: '{{.metadata.annotations.domain_name}}'
+      domain: '{{.metadata.annotations.ingress_domain_name}}'
     configs:
       cm:
-        url: https://{{.metadata.annotations.domain_name}}/argocd
+        url: https://{{.metadata.annotations.ingress_domain_name}}/argocd
         oidc.config: |
           name: Keycloak
-          issuer: https://{{.metadata.annotations.domain_name}}/keycloak/realms/platform
+          issuer: https://{{.metadata.annotations.ingress_domain_name}}/keycloak/realms/platform
           clientID: argocd
           clientSecret: $oidc.keycloak.clientSecret
           requestedScopes: ["openid", "profile", "email", "groups"]
@@ -528,8 +528,11 @@ gitlab:
         operator: In
         values: ['true']
   valuesObject:
-    domain_name: '{{.metadata.annotations.domain_name}}'
+    domain_name: '{{.metadata.annotations.gitlab_domain_name}}'
     initial_root_password: '{{.metadata.annotations.ide_password}}'
+    security_groups: '{{.metadata.annotations.gitlab_security_groups}}'
+    git_username: '{{.metadata.annotations.git_username}}'
+    working_repo: '{{.metadata.annotations.working_repo}}'
 
 keycloak:
   enabled: false
@@ -544,7 +547,7 @@ keycloak:
         operator: In
         values: ['true']
   valuesObject:
-    domain_name: '{{.metadata.annotations.domain_name}}'
+    domain_name: '{{.metadata.annotations.ingress_domain_name}}'
 
 argo-workflows:
   enabled: false
@@ -559,7 +562,7 @@ argo-workflows:
         operator: In
         values: ['true']
   valuesObject:
-    domain_name: '{{.metadata.annotations.domain_name}}'
+    domain_name: '{{.metadata.annotations.ingress_domain_name}}'
 
 backstage:
   enabled: false
@@ -574,8 +577,8 @@ backstage:
         operator: In
         values: ['true']
   valuesObject:
-    ingress:
-      host: '{{.metadata.annotations.domain_name}}'
+    gitlab_domain_name: '{{.metadata.annotations.gitlab_domain_name}}'
+    ingress_domain_name: '{{.metadata.annotations.ingress_domain_name}}'
 
 kargo:
   enabled: false
@@ -592,9 +595,13 @@ kargo:
         values: ['true']
   valuesObject:
     api:
-      # host: '{{.metadata.annotations.domain_name}}'
+      # host: '{{.metadata.annotations.ingress_domain_name}}'
       argocd:
         urls:
-        - https://{{.metadata.annotations.domain_name}}/argocd
+        - https://{{.metadata.annotations.ingress_domain_name}}/argocd
       oidc:
-        issuerURL: https://{{.metadata.annotations.domain_name}}/keycloak/realms/platform
+        issuerURL: https://{{.metadata.annotations.ingress_domain_name}}/keycloak/realms/platform
+      adminAccount:
+        # $IDE_PASSWORD
+        passwordHash: '{{.metadata.annotations.ide_password_hash}}'
+        tokenSigningKey: '{{.metadata.annotations.ide_password_key}}'

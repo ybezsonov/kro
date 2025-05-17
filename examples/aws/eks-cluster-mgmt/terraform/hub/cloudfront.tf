@@ -38,7 +38,7 @@ resource "aws_cloudfront_distribution" "ingress" {
       name  = "X-Forwarded-Proto"
       value = "https"
     }
-    
+
     custom_header {
       name  = "X-Forwarded-Port"
       value = "443"

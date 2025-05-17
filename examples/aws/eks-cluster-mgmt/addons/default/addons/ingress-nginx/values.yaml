@@ -12,7 +12,7 @@ controller:
       service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
       service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
       service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
-    loadbalancerClass: "service.k8s.aws/nlb"
+    loadBalancerClass: "eks.amazonaws.com/nlb"
     ports:
       http: 80
       https: 443

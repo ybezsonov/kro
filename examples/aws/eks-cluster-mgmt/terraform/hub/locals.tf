@@ -12,13 +12,16 @@ locals {
   region                    = data.aws_region.current.id
   cluster_version           = var.kubernetes_version
   argocd_namespace          = "argocd"
-  ingress_security_groups   = "${aws_security_group.ingress_ssh.id},${aws_security_group.ingress_http.id},${aws_security_group.ingress_https.id}"
+  ingress_security_groups   = "${aws_security_group.ingress_http.id},${aws_security_group.ingress_https.id}"
+  gitlab_security_groups    = "${aws_security_group.gitlab_ssh.id},${aws_security_group.gitlab_http.id}"
   ingress_nlb_domain_name   = "${data.aws_lb.ingress_nginx.dns_name}"
-  cloudfront_domain_name    = aws_cloudfront_distribution.ingress.domain_name
-  git_url_gitlab            = var.git_url == "" ? "https://${aws_cloudfront_distribution.ingress.domain_name}/gitlab/" : var.git_url
-  gitops_addons_repo_url    = "${local.git_url_gitlab}${var.git_org_name}/${var.gitops_addons_repo_name}.git"
-  gitops_fleet_repo_url     = "${local.git_url_gitlab}${var.git_org_name}/${var.gitops_fleet_repo_name}.git"
-  gitops_workload_repo_url = "${local.git_url_gitlab}${var.git_org_name}/${var.gitops_workload_repo_name}.git"
+  ingress_domain_name    = aws_cloudfront_distribution.ingress.domain_name
+  gitlab_nlb_domain_name    = "${data.aws_lb.gitlab_nlb.dns_name}"
+  gitlab_domain_name        = aws_cloudfront_distribution.gitlab.domain_name
+  git_url                   = var.git_url == "" ? "https://${local.gitlab_domain_name}/" : var.git_url
+  gitops_addons_repo_url    = "${local.git_url}${var.git_org_name}/${var.gitops_addons_repo_name}.git"
+  gitops_fleet_repo_url     = "${local.git_url}${var.git_org_name}/${var.gitops_fleet_repo_name}.git"
+  gitops_workload_repo_url = "${local.git_url}${var.git_org_name}/${var.gitops_workload_repo_name}.git"
 
   gitops_platform_repo_url = "${var.git_url}${var.git_org_name}/${var.gitops_platform_repo_name}.git"
 
@@ -177,8 +180,14 @@ locals {
     },
     {
       ingress_security_groups = local.ingress_security_groups
-      domain_name = local.cloudfront_domain_name
+      ingress_domain_name = local.ingress_domain_name
+      gitlab_security_groups = local.gitlab_security_groups
+      gitlab_domain_name = local.gitlab_domain_name
+      git_username: data.external.env_vars.result.GIT_USERNAME
+      working_repo: data.external.env_vars.result.WORKING_REPO
       ide_password = data.external.env_vars.result.IDE_PASSWORD
+      ide_password_hash = data.external.env_vars.result.IDE_PASSWORD_HASH
+      ide_password_key = data.external.env_vars.result.IDE_PASSWORD_KEY
     },
 
   )

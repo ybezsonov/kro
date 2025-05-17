@@ -95,7 +95,7 @@ resource "kubernetes_secret" "git_credentials" {
   }
 
   data = {
-    GIT_URL      = "${local.git_url_gitlab}"
+    GIT_URL      = "${local.git_url}"
     GIT_USERNAME = "${var.git_org_name}"
     GIT_PASSWORD = data.external.env_vars.result.IDE_PASSWORD
   }
@@ -121,7 +121,7 @@ module "gitops_bridge_bootstrap" {
     chart_version    = "7.9.1"
     values           = [
       templatefile("${path.module}/argocd-initial-values.yaml", {
-        DOMAIN_NAME = local.cloudfront_domain_name
+        DOMAIN_NAME = local.ingress_domain_name
         ADMIN_PASSWORD = local.password_hash
       })
     ]
@@ -168,8 +168,8 @@ resource "kubernetes_ingress_v1" "argocd_nlb" {
   }
 }
 
-# Output the ArgoCD admin password
-output "admin_password" {
-  description = "The admin password"
-  value       = "${data.external.env_vars.result.IDE_PASSWORD}"
+# Output the ArgoCD URL and login credentials
+output "argocd_access" {
+  description = "ArgoCD access information"
+  value       = "ArgoCD URL: https://${local.ingress_domain_name}/argocd\nLogin: admin\nPassword: ${data.external.env_vars.result.IDE_PASSWORD}"
 }

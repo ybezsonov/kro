@@ -70,19 +70,6 @@ git add .
 git commit -q -m "initial commit"
 ```
 
-4. Install Argo CD cli # TODO: move to bootstrap.sh script
-
-```sh
-# Download the latest Argo CD CLI
-curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-
-# Make the binary executable
-chmod +x argocd-linux-amd64
-
-# Move the binary to a directory in your PATH
-sudo mv argocd-linux-amd64 /usr/local/bin/argocd
-```
-
 ### Creating the Management cluster
 
 1. Update the `terraform.tfvars` with your values:
@@ -134,9 +121,10 @@ echo "ArgoCD URL: https://$DOMAIN_NAME/argocd
 6. Create Gitlab Git repository and secret for Argo CD to access the Git repository:
 
 ```sh
-export GITLAB_URL=https://$DOMAIN_NAME/gitlab
-export NLB_DNS=$(aws elbv2 describe-load-balancers --region $AWS_REGION --names hub-ingress --query 'LoadBalancers[0].DNSName' --output text)
-$WORKSPACE_PATH/$WORKING_REPO/scripts/gitlab/create_gitlab_repos.sh
+export GITLAB_URL=https://$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[0].Id, 'gitlab')].DomainName | [0]" --output text)
+export NLB_DNS=$(aws elbv2 describe-load-balancers --region $AWS_REGION --names gitlab --query 'LoadBalancers[0].DNSName' --output text)
+
+$WORKSPACE_PATH/$WORKING_REPO/scripts/gitlab_create_keys.sh
 
 cd $WORKSPACE_PATH/$WORKING_REPO
 git remote add origin ssh://git@$NLB_DNS/$GIT_USERNAME/$WORKING_REPO.git
@@ -164,7 +152,7 @@ EOF
 > Wait until all Argo CD applications will be deployed successfully.
 
 ```bash
-# Login to ArgoCD CLI 
+# Login to ArgoCD CLI
 argocd login --username admin --password $IDE_PASSWORD --grpc-web-root-path /argocd $DOMAIN_NAME
 
 #List apps
@@ -471,7 +459,6 @@ git push
 # Login to ArgoCD CLI (replace with your ArgoCD server URL)
 argocd login --username admin --password $IDE_PASSWORD --grpc-web-root-path /argocd $DOMAIN_NAME
 
-
 # Sync the cluster-workloads application (if needed)
 argocd app sync cluster-workloads
 
@@ -488,7 +475,7 @@ export KARGO_URL=http://$(kubectl get svc kargo-api -n kargo -o jsonpath='{.stat
 curl --head -X GET --retry 20 --retry-all-errors --retry-delay 15 \
   --connect-timeout 5 --max-time 10 -k $KARGO_URL
 echo "Kargo url: $KARGO_URL"
-echo "Kargo password: kargo-password"
+echo "Kargo password: $IDE_PASSWORD"
 ```
 
 2. Kargo project `rollouts-demo-kargo ` should be available, but `rollouts-demo` Warehouse cannot access Git repository. Give access Kargo to Git `rollouts-demo-deploy` repository:
@@ -518,6 +505,10 @@ kubectl -n kargo rollout restart deploy kargo-controller
 ```sh
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh orange
 ```
+
+### Promote the application to pre-prod
+
+1. Login to Gitlab as `user1` and merge Pull request in `rollouts-demo-deploy` project for promotion to `pre-prod`.
 
 ### Promote the application to prod clusters
 
@@ -665,7 +656,7 @@ echo "Argo-Workflows: https://$DOMAIN_NAME/argo-workflows
    SSO Login: user1
    Password: $IDE_PASSWORD"
 
-echo "Gitlab: https://$DOMAIN_NAME/gitlab
+echo "Gitlab: $GITLAB_URL
    Login: root
    Password: $IDE_PASSWORD
    Login: user1
@@ -673,5 +664,5 @@ echo "Gitlab: https://$DOMAIN_NAME/gitlab
 
 export KARGO_URL=http://$(kubectl get svc kargo-api -n kargo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 echo "Kargo url: $KARGO_URL"
-echo "Kargo password: kargo-password"
+echo "Kargo password: $IDE_PASSWORD"
 ```

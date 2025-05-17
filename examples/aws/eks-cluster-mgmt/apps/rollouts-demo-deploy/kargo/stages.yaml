@@ -37,7 +37,7 @@ spec:
     spec:
       steps:
       - task:
-          name: promote
+          name: promote-with-pr
 ---
 apiVersion: kargo.akuity.io/v1alpha1
 kind: Stage

@@ -71,7 +71,7 @@ data:
   app-config.yaml: |
     app:
       title: Platform Backstage
-      baseUrl: https://{{ .Values.ingress.host }}
+      baseUrl: https://{{ .Values.ingress_domain_name }}
     organization:
       name: CNOE
     backend:
@@ -81,7 +81,7 @@ data:
       # auth:
       #   keys:
       #     - secret: ${BACKEND_SECRET}
-      baseUrl: https://{{ .Values.ingress.host }}
+      baseUrl: https://{{ .Values.ingress_domain_name }}
       listen:
         port: 7007
         # Uncomment the following host directive to bind to specific interfaces
@@ -91,7 +91,7 @@ data:
         # Content-Security-Policy directives follow the Helmet format: https://helmetjs.github.io/#reference
         # Default Helmet Content-Security-Policy values can be removed by setting the key to false
       cors:
-        origin: https://{{ .Values.ingress.host }}
+        origin: https://{{ .Values.ingress_domain_name }}
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
         credentials: true
       database:
@@ -108,9 +108,9 @@ data:
     integrations:
       gitlab:
         - token: ${GIT_PASSWORD}
-          apiBaseUrl: ${GIT_URL}
+          apiBaseUrl: ${GIT_URL}/api/v4
           baseUrl: ${GIT_URL}
-          host: {{ .Values.ingress.host }}
+          host: {{ .Values.gitlab_domain_name }}
     #  gitea:
     #   - baseUrl: https://cnoe.localtest.me:8443/gitea
     #     host: cnoe.localtest.me:8443
@@ -271,7 +271,7 @@ spec:
             - name: NODE_EXTRA_CA_CERTS
               value: "/app/config/ca.crt"
             - name: DOMAIN_NAME
-              value: {{ .Values.ingress.host }}
+              value: {{ .Values.ingress_domain_name }}
           envFrom:
             - secretRef:
                 name: backstage-env-vars
@@ -392,14 +392,14 @@ spec:
     template:
       engineVersion: v2
       data:
-        BACKSTAGE_FRONTEND_URL: https://{{ .Values.ingress.host }}
+        BACKSTAGE_FRONTEND_URL: https://{{ .Values.ingress_domain_name }}
         POSTGRES_HOST: postgresql.backstage.svc.cluster.local
         POSTGRES_PORT: '5432'
         POSTGRES_DB: backstage
         POSTGRES_USER: backstage
         POSTGRES_PASSWORD: "{{ `{{.POSTGRES_PASSWORD}}` }}"
-        ARGO_WORKFLOWS_URL: https://{{ .Values.ingress.host }}/argo-workflows
-        KEYCLOAK_NAME_METADATA: https://{{ .Values.ingress.host }}/keycloak/realms/platform/.well-known/openid-configuration
+        ARGO_WORKFLOWS_URL: https://{{ .Values.ingress_domain_name }}/argo-workflows
+        KEYCLOAK_NAME_METADATA: https://{{ .Values.ingress_domain_name }}/keycloak/realms/platform/.well-known/openid-configuration
         KEYCLOAK_CLIENT_SECRET: "{{ `{{.BACKSTAGE_CLIENT_SECRET}}` }}"
         ARGOCD_AUTH_TOKEN: "argocd.token={{ `{{.ARGOCD_SESSION_TOKEN}}` }}"
         ARGO_CD_URL: 'https://argocd-server.argocd.svc.cluster.local/api/v1/'
@@ -430,7 +430,7 @@ metadata:
 spec:
   ingressClassName: "nginx"
   rules:
-    - host: {{ .Values.ingress.host | default "*" }}
+    - host: {{ .Values.ingress_domain_name | default "*" }}
       http:
         paths:
           - path: /

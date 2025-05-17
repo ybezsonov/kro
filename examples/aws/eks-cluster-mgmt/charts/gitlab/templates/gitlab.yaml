@@ -66,7 +66,7 @@ spec:
         env:
         - name: GITLAB_OMNIBUS_CONFIG
           value: |
-            external_url 'http://{{ .Values.domain_name }}/gitlab'
+            external_url 'http://{{ .Values.domain_name }}'
             gitlab_rails['gitlab_shell_ssh_port'] = 22
             gitlab_rails['gitlab_shell_git_timeout'] = 800
             gitlab_rails['enabled_git_access_protocol'] = 'ssh'
@@ -149,14 +149,14 @@ spec:
           runAsUser: 0
         livenessProbe:
           httpGet:
-            path: /gitlab/-/liveness
+            path: /-/liveness
             port: 80
           initialDelaySeconds: 180
           timeoutSeconds: 15
           periodSeconds: 30
         readinessProbe:
           httpGet:
-            path: /gitlab/-/readiness
+            path: /-/readiness
             port: 80
           initialDelaySeconds: 180
           timeoutSeconds: 15
@@ -172,38 +172,25 @@ spec:
           mountPath: /var/opt/gitlab
           subPath: data
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: gitlab
-  namespace: gitlab
-  annotations:
-    kubernetes.io/ingress.class: nginx
-spec:
-  ingressClassName: nginx
-  rules:
-    - host: {{ .Values.domain_name }}
-      http:
-        paths:
-          - path: /gitlab
-            pathType: Prefix
-            backend:
-              service:
-                name: gitlab
-                port:
-                  number: 80
----
 apiVersion: v1
 kind: Service
 metadata:
   name: gitlab
   namespace: gitlab
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-name: "gitlab"
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-security-groups: "{{ .Values.security_groups }}"
+    service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
 spec:
-  type: ClusterIP
+  type: LoadBalancer
+  loadBalancerClass: eks.amazonaws.com/nlb
   ports:
   - name: http
-    targetPort: 80
     port: 80
+    targetPort: 80
   - name: ssh
     port: 22
     targetPort: 22

@@ -34,7 +34,3 @@ api:
   tls:
     enabled: false
     terminatedUpstream: true
-  adminAccount:
-    # kargo-password
-    passwordHash: $2y$10$0sA5poX4OmqqoMQEdHv4N.gHic8aM3UQeqgU0OPgzha6djiK84F5m
-    tokenSigningKey: 28yCIWwbkBBBADFS62DdN4OWFqfhUvHq

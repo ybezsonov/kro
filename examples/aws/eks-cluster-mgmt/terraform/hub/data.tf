@@ -19,5 +19,5 @@ data "aws_iam_session_context" "current" {
 
 # External data source to read environment variables
 data "external" "env_vars" {
-  program = ["bash", "-c", "echo '{\"IDE_PASSWORD\":\"'\"$IDE_PASSWORD\"'\"}'"]
+  program = ["bash", "-c", "echo '{\"IDE_PASSWORD\":\"'\"$IDE_PASSWORD\"'\", \"IDE_PASSWORD_HASH\":\"'\"$IDE_PASSWORD_HASH\"'\", \"IDE_PASSWORD_KEY\":\"'\"$IDE_PASSWORD_KEY\"'\", \"GIT_USERNAME\":\"'\"$GIT_USERNAME\"'\", \"WORKING_REPO\":\"'\"$WORKING_REPO\"'\"}'"]
 }
