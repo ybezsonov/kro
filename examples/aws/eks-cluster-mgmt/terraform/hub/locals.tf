@@ -186,8 +186,8 @@ locals {
       git_username: data.external.env_vars.result.GIT_USERNAME
       working_repo: data.external.env_vars.result.WORKING_REPO
       ide_password = data.external.env_vars.result.IDE_PASSWORD
-      ide_password_hash = data.external.env_vars.result.IDE_PASSWORD_HASH
-      ide_password_key = data.external.env_vars.result.IDE_PASSWORD_KEY
+      ide_password_hash = local.password_hash
+      ide_password_key = local.password_key
     },
 
   )

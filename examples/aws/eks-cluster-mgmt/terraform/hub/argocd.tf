@@ -11,17 +11,30 @@ resource "kubernetes_namespace" "argocd" {
   }
 }
 
-# Store bcrypt hash in a local variable to avoid regenerating it on each run
-locals {
-  password_hash_file = "${path.module}/argocd-password-hash.txt"
-  existing_hash = fileexists(local.password_hash_file) ? file(local.password_hash_file) : ""
-  password_hash = local.existing_hash != "" ? local.existing_hash : bcrypt(data.external.env_vars.result.IDE_PASSWORD)
+# Generate password key using external data source
+data "external" "password_key" {
+  program = ["bash", "-c", "echo '{\"result\":\"'$(openssl rand -base64 48 | tr -d \"=+/\" | head -c 32 | base64)'\"}'"]
 }
 
-# Create the hash file if it doesn't exist, but don't use count
-resource "local_file" "argocd_password_hash" {
-  content  = local.password_hash
-  filename = local.password_hash_file
+# Store both hash and key in a single file to avoid regenerating on each run
+locals {
+  password_file = "${path.module}/argocd-password-hash.txt"
+  
+  # Check if file exists and parse its content
+  existing_data = fileexists(local.password_file) ? jsondecode(file(local.password_file)) : { hash = "", key = "" }
+  
+  # Use existing values if available, otherwise generate new ones
+  password_hash = local.existing_data.hash != "" ? local.existing_data.hash : bcrypt(data.external.env_vars.result.IDE_PASSWORD)
+  password_key = local.existing_data.key != "" ? local.existing_data.key : data.external.password_key.result.result
+}
+
+# Create the file with both hash and key
+resource "local_file" "argocd_password_data" {
+  content  = jsonencode({
+    hash = local.password_hash
+    key = local.password_key
+  })
+  filename = local.password_file
 
   # Only update the file if it doesn't exist or is empty
   lifecycle {
