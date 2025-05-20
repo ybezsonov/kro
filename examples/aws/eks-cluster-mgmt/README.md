@@ -1,6 +1,6 @@
 # Amazon EKS multi cluster management using kro & ACK and continuous promotion to multiple environments using Argo CD, Kargo and Argo Rollouts
 
-update script
+update script 2
 
 ## Overview of a solution
 
