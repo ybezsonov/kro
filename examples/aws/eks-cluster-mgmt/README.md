@@ -306,6 +306,17 @@ $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh
 
 ![Kargo continuous promotion](docs/kargo-promotion.png)
 
+When you play with creating other color builds and promoting them to different environments, you can execute following script, to have a dachboard, with all 4 clusters application deployment:
+
+```bash
+$WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/multi-cluster-dashboard-generator.sh
+```
+
+then download the generated Dashboard html, and open it in your browser
+
+![Promotion dashboard](docs/argo-rollout-promotion-dashboard.png)
+
+
 ## Other tools
 
 We have deployed other tools in our environment, you can get the list of them by running the following script
