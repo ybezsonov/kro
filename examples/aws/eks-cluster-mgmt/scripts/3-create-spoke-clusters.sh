@@ -31,34 +31,41 @@
 #
 #############################################################################
 
-echo "Configure spoke cluster accounts in Argo CD application for ACK controller:"
+# Source the colors script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/colors.sh"
 
+print_header "Creating Spoke EKS Clusters"
+
+print_step "Configuring spoke cluster accounts in Argo CD application for ACK controller"
 sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$MGMT_ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml"
 
-echo "activate the account numbers"
+print_step "Activating the account numbers"
 sed -i 's/# \(cluster-test: "[0-9]*"\)/\1/g; s/# \(cluster-pre-prod: "[0-9]*"\)/\1/g; s/# \(cluster-prod-eu: "[0-9]*"\)/\1/g; s/# \(cluster-prod-us: "[0-9]*"\)/\1/g' /home/ec2-user/environment/eks-cluster-mgmt/addons/tenants/tenant1/default/addons/multi-acct/values.yaml
 
+print_info "Opening multi-acct values.yaml file for review"
 /usr/lib/code-server/bin/code-server $WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml
 
+print_step "Committing changes for namespaces and resources"
 cd $WORKSPACE_PATH/$WORKING_REPO/
 git status
 git add .
 git commit -m "add namespaces and resources for clusters"
 git push
 
-echo "Sync the cluster-workloads application"
+print_step "Syncing the cluster-workloads application"
 argocd app sync multi-acct-hub-cluster
 
-echo "Wait for the rollouts-demo-kargo application to be synced and healthy"
+print_step "Waiting for the rollouts-demo-kargo application to be synced and healthy"
 argocd app wait multi-acct-hub-cluster --health --sync
 
-echo "Update cluster definitions with Management account ID:"
+print_step "Updating cluster definitions with Management account ID"
 sed -i 's/MANAGEMENT_ACCOUNT_ID/'"$MGMT_ACCOUNT_ID"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 sed -i 's|GITLAB_URL|'"$GITLAB_URL"'|g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 sed -i 's/GIT_USERNAME/'"$GIT_USERNAME"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 sed -i 's/WORKING_REPO/'"$WORKING_REPO"'/g' "$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 
-echo "update fleet spoke clusters"
+print_step "Enabling fleet spoke clusters"
 sed -i '
 # First uncomment the section headers
 s/^  # cluster-test:/  cluster-test:/g
@@ -80,17 +87,21 @@ s/^  # cluster-prod-eu:/  cluster-prod-eu:/g
   /^  # workload-cluster1:/!s/^  #/  /g
 }' /home/ec2-user/environment/eks-cluster-mgmt/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml
 
+print_info "Opening cluster values.yaml file for review"
 /usr/lib/code-server/bin/code-server $WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml
 
+print_step "Committing changes to Git repository"
 cd $WORKSPACE_PATH/$WORKING_REPO/
 git status
 git add .
 git commit -m "add clusters definitions"
 git push
 
+print_step "Syncing clusters application in ArgoCD"
 argocd app sync clusters
 
+print_info "Checking EKS cluster creation status"
 kubectl get EksClusterwithvpcs -A
 
-echo "Spoke EKS clusters creation initiated."
-echo "Next step: Run 4-deploy-argo-rollouts-demo.sh to deploy the Argo Rollouts demo application."
+print_success "Spoke EKS clusters creation initiated."
+print_info "Next step: Run 4-deploy-argo-rollouts-demo.sh to deploy the Argo Rollouts demo application."

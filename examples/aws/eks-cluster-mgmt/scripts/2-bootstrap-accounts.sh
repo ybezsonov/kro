@@ -25,29 +25,34 @@
 #
 #############################################################################
 
-echo "Bootstrapping Management/Spoke accounts"
+# Source the colors script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/colors.sh"
 
+print_header "Bootstrapping Management and Spoke Accounts"
+
+print_step "Creating ACK workload roles"
 cd $WORKSPACE_PATH/$WORKING_REPO/scripts
 ./create_ack_workload_roles.sh
 
-
-echo "Checking ResourceGraphDefinitions status..."
+print_header "Checking ResourceGraphDefinitions Status"
+print_info "Waiting for all ResourceGraphDefinitions to become Active..."
 
 while true; do
   # Get all ResourceGraphDefinitions and check if any are not in Active state
   inactive_rgds=$(kubectl get resourcegraphdefinitions.kro.run -o jsonpath='{.items[?(@.status.state!="Active")].metadata.name}')
   
   if [ -z "$inactive_rgds" ]; then
-    echo "All ResourceGraphDefinitions are in Active state!"
+    print_success "All ResourceGraphDefinitions are in Active state!"
     break
   else
-    echo "Found ResourceGraphDefinitions not in Active state: $inactive_rgds"
-    echo "Restarting kro deployment in kro-system namespace..."
+    print_warning "Found ResourceGraphDefinitions not in Active state: $inactive_rgds"
+    print_step "Restarting kro deployment in kro-system namespace..."
     kubectl rollout restart deployment -n kro-system kro
-    echo "Waiting 30 seconds before checking again..."
+    print_info "Waiting 30 seconds before checking again..."
     sleep 30
   fi
 done
 
-echo "Account bootstrapping completed successfully."
-echo "Next step: Run 3-create-spoke-clusters.sh to create the spoke EKS clusters."
+print_success "Account bootstrapping completed successfully."
+print_info "Next step: Run 3-create-spoke-clusters.sh to create the spoke EKS clusters."

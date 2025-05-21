@@ -25,30 +25,39 @@
 #
 #############################################################################
 
+# Source the colors script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/colors.sh"
+
 # Set AWS_PAGER to empty to disable paging
 export AWS_PAGER=""
 
-# Define colors for better readability
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
 # Path to values.yaml file
 VALUES_FILE="/home/ec2-user/environment/eks-cluster-mgmt/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
+
+# Debug: Check if values.yaml exists and show its content
+print_info "Checking if values.yaml exists at: $VALUES_FILE"
+if [ -f "$VALUES_FILE" ]; then
+    print_success "Values file found"
+    print_info "First 20 lines of values.yaml:"
+    head -n 20 "$VALUES_FILE"
+else
+    print_error "Values file NOT found at: $VALUES_FILE"
+    print_info "Searching for values.yaml files:"
+    find /home/ec2-user/environment -name "values.yaml" | grep -i cluster
+fi
 
 # Function to check if a cluster exists
 check_cluster_exists() {
     local cluster_name="$1"
     local region="$2"
     
-    echo -e "${BLUE}Checking if cluster $cluster_name exists in region $region...${NC}"
+    print_info "Checking if cluster $cluster_name exists in region $region..."
     if aws eks describe-cluster --name "$cluster_name" --region "$region" &> /dev/null; then
-        echo -e "${GREEN}Cluster $cluster_name exists in region $region.${NC}"
+        print_success "Cluster $cluster_name exists in region $region."
         return 0
     else
-        echo -e "${RED}Cluster $cluster_name does not exist in region $region.${NC}"
+        print_error "Cluster $cluster_name does not exist in region $region."
         return 1
     fi
 }
@@ -56,42 +65,56 @@ check_cluster_exists() {
 # Function to add ide-user to cluster access entries
 add_ide_user_to_cluster() {
     local cluster_name="$1"
-    local region="$2"
+    local account_id="$2"
+    local region="$3"
     
-    echo -e "${BLUE}Adding ide-user to access entries for $cluster_name in $region...${NC}"
+    print_step "Adding ide-user to access entries for $cluster_name in $region..."
+    
+    # Debug: Show current AWS identity
+    print_info "Current AWS identity:"
+    aws sts get-caller-identity
+    
+    # Use the proper IAM role ARN format instead of the STS assumed role
+    local role_arn="arn:aws:iam::${account_id}:role/ide-user"
+    print_info "Using role ARN: $role_arn"
     
     # Check if access entry already exists
-    if aws eks describe-access-entry --cluster-name "$cluster_name" --principal-arn "arn:aws:iam::862416928860:role/ide-user" --region "$region" &> /dev/null; then
-        echo -e "${YELLOW}Access entry for ide-user already exists in $cluster_name${NC}"
+    print_info "Checking if access entry already exists..."
+    if aws eks describe-access-entry --cluster-name "$cluster_name" --principal-arn "$role_arn" --region "$region" &> /dev/null; then
+        print_warning "Access entry for ide-user already exists in $cluster_name"
         
         # Check if admin policy is associated
-        if ! aws eks list-associated-access-policies --cluster-name "$cluster_name" --principal-arn "arn:aws:iam::862416928860:role/ide-user" --region "$region" | grep -q "AmazonEKSClusterAdminPolicy"; then
-            echo "Associating admin policy with ide-user..."
+        print_info "Checking if admin policy is associated..."
+        if ! aws eks list-associated-access-policies --cluster-name "$cluster_name" --principal-arn "$role_arn" --region "$region" | grep -q "AmazonEKSClusterAdminPolicy"; then
+            print_info "Associating admin policy with ide-user..."
             aws eks associate-access-policy \
                 --cluster-name "$cluster_name" \
-                --principal-arn "arn:aws:iam::862416928860:role/ide-user" \
+                --principal-arn "$role_arn" \
                 --policy-arn "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy" \
                 --access-scope type=cluster \
                 --region "$region"
+            print_info "Admin policy association result: $?"
         else
-            echo -e "${YELLOW}Admin policy already associated with ide-user for $cluster_name${NC}"
+            print_warning "Admin policy already associated with ide-user for $cluster_name"
         fi
     else
         # Create access entry
-        echo "Creating access entry for ide-user..."
+        print_info "Creating access entry for ide-user..."
         aws eks create-access-entry \
             --cluster-name "$cluster_name" \
-            --principal-arn "arn:aws:iam::862416928860:role/ide-user" \
+            --principal-arn "$role_arn" \
             --region "$region"
+        print_info "Access entry creation result: $?"
         
         # Associate admin policy
-        echo "Associating admin policy with ide-user..."
+        print_info "Associating admin policy with ide-user..."
         aws eks associate-access-policy \
             --cluster-name "$cluster_name" \
-            --principal-arn "arn:aws:iam::862416928860:role/ide-user" \
+            --principal-arn "$role_arn" \
             --policy-arn "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy" \
             --access-scope type=cluster \
             --region "$region"
+        print_info "Admin policy association result: $?"
     fi
 }
 
@@ -100,16 +123,23 @@ update_kubeconfig() {
     local cluster_name="$1"
     local region="$2"
     
-    echo -e "${BLUE}Updating kubeconfig for $cluster_name...${NC}"
+    print_step "Updating kubeconfig for $cluster_name..."
     aws eks update-kubeconfig --name "$cluster_name" --region "$region" --alias "$cluster_name"
+    print_info "Update kubeconfig result: $?"
+    
+    # Debug: Show current kubeconfig contexts
+    print_info "Available kubectl contexts:"
+    kubectl config get-contexts
     
     # Verify connection
-    echo -e "${BLUE}Verifying connection to $cluster_name...${NC}"
+    print_info "Verifying connection to $cluster_name..."
     if kubectl --context="$cluster_name" get nodes &> /dev/null; then
-        echo -e "${GREEN}Successfully connected to $cluster_name${NC}"
+        print_success "Successfully connected to $cluster_name"
         return 0
     else
-        echo -e "${RED}Failed to connect to $cluster_name${NC}"
+        print_error "Failed to connect to $cluster_name"
+        print_info "Detailed error output:"
+        kubectl --context="$cluster_name" get nodes --v=8
         return 1
     fi
 }
@@ -120,36 +150,36 @@ connect_to_cluster() {
     local account_id="$2"
     local region="$3"
     
-    echo -e "\n${GREEN}=========================================================${NC}"
-    echo -e "${GREEN}Connecting to cluster: $cluster_name${NC}"
-    echo -e "${GREEN}AWS Account ID: $account_id${NC}"
-    echo -e "${GREEN}Region: $region${NC}"
-    echo -e "${GREEN}=========================================================${NC}"
+    echo -e "\n${BOLD}${GREEN}=========================================================${NC}"
+    echo -e "${BOLD}${GREEN}Connecting to cluster: $cluster_name${NC}"
+    echo -e "${BOLD}${GREEN}AWS Account ID: $account_id${NC}"
+    echo -e "${BOLD}${GREEN}Region: $region${NC}"
+    echo -e "${BOLD}${GREEN}=========================================================${NC}"
     
     # Check if cluster exists
     if ! check_cluster_exists "$cluster_name" "$region"; then
-        echo -e "${RED}Skipping $cluster_name as it does not exist.${NC}"
+        print_error "Skipping $cluster_name as it does not exist."
         return 1
     fi
     
     # Add ide-user to cluster access entries
-    add_ide_user_to_cluster "$cluster_name" "$region"
+    add_ide_user_to_cluster "$cluster_name" "$account_id" "$region"
     
     # Update kubeconfig and verify connection
     if ! update_kubeconfig "$cluster_name" "$region"; then
-        echo -e "${RED}Could not establish connection to $cluster_name. Skipping further operations.${NC}"
+        print_error "Could not establish connection to $cluster_name. Skipping further operations."
         return 1
     fi
     
     # Get cluster nodes
-    echo -e "${BLUE}Nodes in $cluster_name:${NC}"
+    print_step "Nodes in $cluster_name:"
     kubectl --context="$cluster_name" get nodes
     
     # Get services in all namespaces
-    echo -e "${BLUE}Services in $cluster_name:${NC}"
+    print_step "Services in $cluster_name:"
     kubectl --context="$cluster_name" get svc -A
     
-    echo -e "${GREEN}Successfully connected to $cluster_name${NC}"
+    print_success "Successfully connected to $cluster_name"
     return 0
 }
 
@@ -157,63 +187,53 @@ connect_to_cluster() {
 parse_values_yaml() {
     # Check if values.yaml exists
     if [ ! -f "$VALUES_FILE" ]; then
-        echo -e "${RED}Values file not found: $VALUES_FILE${NC}"
-        exit 1
+        print_error "Values file not found: $VALUES_FILE"
+        return
     fi
     
-    echo -e "${BLUE}Parsing values.yaml to extract cluster information...${NC}"
+    print_header "Parsing values.yaml to extract cluster information"
     
-    # Extract cluster information using grep and awk
-    # This is a simple parser and might not work for all YAML structures
-    local in_clusters_section=false
-    local current_cluster=""
-    local account_id=""
-    local region=""
+    # Debug: Count clusters in the file
+    local cluster_count=$(grep -c "^[[:space:]]*cluster-" "$VALUES_FILE")
+    print_info "Found $cluster_count cluster entries in values.yaml"
     
-    while IFS= read -r line; do
-        # Check if we're in the clusters section
-        if [[ "$line" =~ ^clusters: ]]; then
-            in_clusters_section=true
-            continue
-        fi
+    # Use a more targeted approach to extract cluster information
+    local clusters_found=0
+    
+    # Get all cluster names from the file
+    local cluster_names=$(grep -o "cluster-[a-zA-Z0-9_-]*:" "$VALUES_FILE" | sed 's/://')
+    
+    # Process each cluster
+    for cluster_name in $cluster_names; do
+        print_info "Processing cluster: $cluster_name"
         
-        # Skip commented lines
-        if [[ "$line" =~ ^[[:space:]]*# ]]; then
-            continue
-        fi
+        # Extract account ID for this cluster
+        local account_id=$(grep -A 30 "$cluster_name:" "$VALUES_FILE" | grep "accountId:" | head -1 | sed 's/.*accountId:[[:space:]]*"\([^"]*\)".*/\1/')
         
-        # Check if we're in a cluster definition
-        if [[ "$in_clusters_section" == true && "$line" =~ ^[[:space:]]+([^:]+): ]]; then
-            current_cluster="${BASH_REMATCH[1]}"
-            continue
-        fi
+        # Extract region for this cluster
+        local region=$(grep -A 30 "$cluster_name:" "$VALUES_FILE" | grep "region:" | head -1 | sed 's/.*region:[[:space:]]*"\([^"]*\)".*/\1/')
         
-        # Extract accountId
-        if [[ "$current_cluster" != "" && "$line" =~ [[:space:]]+accountId:[[:space:]]+\"([^\"]+)\" ]]; then
-            account_id="${BASH_REMATCH[1]}"
-        fi
-        
-        # Extract region
-        if [[ "$current_cluster" != "" && "$line" =~ [[:space:]]+region:[[:space:]]+\"([^\"]+)\" ]]; then
-            region="${BASH_REMATCH[1]}"
+        if [[ -n "$account_id" && -n "$region" ]]; then
+            print_info "Found account ID for $cluster_name: $account_id"
+            print_info "Found region for $cluster_name: $region"
             
-            # If we have all the information, connect to the cluster
-            if [[ "$current_cluster" != "" && "$account_id" != "" && "$region" != "" ]]; then
-                connect_to_cluster "$current_cluster" "$account_id" "$region"
-                current_cluster=""
-                account_id=""
-                region=""
-            fi
+            # Connect to the cluster
+            connect_to_cluster "$cluster_name" "$account_id" "$region"
+            clusters_found=$((clusters_found + 1))
+        else
+            print_warning "Could not find account ID or region for $cluster_name"
         fi
-    done < "$VALUES_FILE"
+    done
+    
+    print_info "Total clusters processed from values.yaml: $clusters_found"
 }
 
 # Main script execution
-echo -e "${GREEN}Starting EKS cluster access setup...${NC}"
-echo -e "${YELLOW}This script will connect to all clusters defined in values.yaml${NC}"
-echo -e "${YELLOW}It is idempotent and can be run multiple times without errors${NC}"
+print_header "Starting EKS cluster access setup"
+print_warning "This script will connect to all clusters defined in values.yaml"
+print_warning "It is idempotent and can be run multiple times without errors"
 
 # Parse values.yaml and connect to clusters
 parse_values_yaml
 
-echo -e "${GREEN}EKS cluster access setup completed.${NC}"
+print_success "EKS cluster access setup completed."

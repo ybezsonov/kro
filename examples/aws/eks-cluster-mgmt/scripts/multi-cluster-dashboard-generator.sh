@@ -29,18 +29,12 @@
 #
 #############################################################################
 
+# Source the colors script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/colors.sh"
+
 # Set AWS_PAGER to empty to disable paging
 export AWS_PAGER=""
-
-# Define colors for better readability
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
-
-# Path to values.yaml file
-VALUES_FILE="/home/ec2-user/environment/eks-cluster-mgmt/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml"
 
 # Path to output HTML file
 OUTPUT_HTML="/home/ec2-user/environment/eks-cluster-mgmt/scripts/dashboard.html"
@@ -51,17 +45,20 @@ TEMP_FILE="/tmp/cluster_info.json"
 # Initialize the JSON array
 echo "[]" > "$TEMP_FILE"
 
+# Ensure the directory exists
+mkdir -p "$(dirname "$OUTPUT_HTML")"
+
 # Function to check if a cluster exists
 check_cluster_exists() {
     local cluster_name="$1"
     local region="$2"
     
-    echo -e "${BLUE}Checking if cluster $cluster_name exists in region $region...${NC}"
+    print_info "Checking if cluster $cluster_name exists in region $region..."
     if aws eks describe-cluster --name "$cluster_name" --region "$region" &> /dev/null; then
-        echo -e "${GREEN}Cluster $cluster_name exists in region $region.${NC}"
+        print_success "Cluster $cluster_name exists in region $region."
         return 0
     else
-        echo -e "${RED}Cluster $cluster_name does not exist in region $region.${NC}"
+        print_error "Cluster $cluster_name does not exist in region $region."
         return 1
     fi
 }
@@ -72,14 +69,14 @@ get_argo_demo_url() {
     local region="$2"
     local environment="$3"
     
-    echo -e "${BLUE}Getting Argo demo app URL for $cluster_name in $region...${NC}"
+    print_info "Getting Argo demo app URL for $cluster_name in $region..."
     
     # Update kubeconfig for this cluster
     aws eks update-kubeconfig --name "$cluster_name" --region "$region" --alias "$cluster_name" > /dev/null
     
     # Check if we can connect to the cluster
     if ! kubectl --context="$cluster_name" get nodes &> /dev/null; then
-        echo -e "${RED}Failed to connect to $cluster_name. Skipping URL retrieval.${NC}"
+        print_error "Failed to connect to $cluster_name. Skipping URL retrieval."
         return 1
     fi
     
@@ -88,16 +85,16 @@ get_argo_demo_url() {
     ingress_url=$(kubectl --context="$cluster_name" get ingress -n rollouts-demo rollouts-demo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
     
     if [[ -z "$ingress_url" ]]; then
-        echo -e "${YELLOW}No ingress URL found for rollouts-demo in $cluster_name. Checking ALB ingress...${NC}"
+        print_warning "No ingress URL found for rollouts-demo in $cluster_name. Checking ALB ingress..."
         ingress_url=$(kubectl --context="$cluster_name" get ingress.networking.k8s.io -n rollouts-demo rollouts-demo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
     fi
     
     if [[ -z "$ingress_url" ]]; then
-        echo -e "${RED}No ingress URL found for rollouts-demo in $cluster_name.${NC}"
+        print_error "No ingress URL found for rollouts-demo in $cluster_name."
         return 1
     fi
     
-    echo -e "${GREEN}Found Argo demo app URL for $cluster_name: http://$ingress_url${NC}"
+    print_success "Found Argo demo app URL for $cluster_name: http://$ingress_url"
     
     # Add the cluster information to the JSON file
     local temp_json
@@ -112,7 +109,7 @@ get_argo_demo_url() {
 
 # Function to manually add known clusters
 add_known_clusters() {
-    echo -e "${BLUE}Adding known clusters to the dashboard...${NC}"
+    print_header "Adding known clusters to the dashboard"
     
     # cluster-test in eu-central-1
     if check_cluster_exists "cluster-test" "eu-central-1"; then
@@ -137,7 +134,7 @@ add_known_clusters() {
 
 # Function to generate the HTML dashboard
 generate_dashboard() {
-    echo -e "${BLUE}Generating HTML dashboard...${NC}"
+    print_header "Generating HTML dashboard"
     
     # Read the cluster information from the JSON file
     local clusters
@@ -256,11 +253,11 @@ EOF
 </html>
 EOF
     
-    echo -e "${GREEN}HTML dashboard generated: $OUTPUT_HTML${NC}"
+    print_success "HTML dashboard generated: $OUTPUT_HTML"
 }
 
 # Main script execution
-echo -e "${GREEN}Starting multi-cluster dashboard generation...${NC}"
+print_header "Starting multi-cluster dashboard generation"
 
 # Add known clusters
 add_known_clusters
@@ -268,6 +265,6 @@ add_known_clusters
 # Generate the HTML dashboard
 generate_dashboard
 
-echo -e "${GREEN}Dashboard generation completed.${NC}"
-echo -e "${GREEN}Dashboard available at: $OUTPUT_HTML${NC}"
-echo -e "${YELLOW}Open this file in a web browser to view all environments side by side.${NC}"
+print_success "Dashboard generation completed."
+print_info "Dashboard available at: ${BOLD}$OUTPUT_HTML${NC}"
+print_info "Open this file in a web browser to view all environments side by side."

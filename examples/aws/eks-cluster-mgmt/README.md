@@ -170,7 +170,7 @@ This script creates the spoke EKS clusters in different regions. It:
 
 You can check the files : `$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml` and `$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml` if you want to make some changes to the created spoke workloads.
 
-After some times, the clusters should have been created in the spoke/management account(s):
+> After some times (15-20mn), the clusters should have been created in the spoke/management account(s):
 
 ```sh
 kubectl get EksClusterwithvpcs -A
@@ -202,7 +202,7 @@ kubectl get vpcs -A
 
 > If you see errors, you may need to double check the multi-cluster accounts settings, and if IAM roles in both management and spoke AWS accounts are properly configured.
 
-8. When VPC are ok, then check for EKS resources:
+When VPC are ok, then check for EKS resources:
 
 ```sh
 kubectl get eksclusters.kro.run -A
@@ -249,12 +249,6 @@ This script deploys the Argo Rollouts demo application to the EKS clusters. It p
 5. Configures ArgoCD and Kargo for the application deployment
 6. Sets up access for Kargo to the Git repository
 
-We can also configure our kubectl to be able to connect on all the clusters using the cross-account eks-cluster-mgmt-eks role
-
-```bash
-aws eks update-kubeconfig --name cluster-test --region eu-central-1 --role-arn arn:aws:iam::862416928860:role/eks-cluster-mgmt-eks
-```
-
 ### Configure EKS Cluster Access to all spoke clusters
 
 ```sh
@@ -268,12 +262,12 @@ This script configures access to the EKS clusters created in the previous steps.
 
 After that, you can use kubectl to connect to any of the EKS clusters.
 
-> use kctx or k9s to check all clusters
+> use kubectx or k9s to check all clusters
 
-This script also create an html file that will be use as a dashboard for our demo application progressive rollout, the dashboard is available at: `/home/ec2-user/environment/eks-cluster-mgmt/scripts/dashboard.html`
+This script also create an html file that will be use as a dashboard for our demo application progressive rollout, the dashboard is available at: `/home/ec2-user/environment/kro/examples/aws/eks-cluster-mgmt/scripts/dashboard.html`
 
 ```bash
-code /home/ec2-user/environment/eks-cluster-mgmt/scripts/dashboard.html
+code /home/ec2-user/environment/kro/examples/aws/eks-cluster-mgmt/scripts/dashboard.html
 ```
 
 > Download the dashboard, and open it in your browser
@@ -327,7 +321,7 @@ $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/6-tools-urls.sh
 - *Backstage* is used to manage templates and allow developers to easilly add new applications into the environments.
 - *Argo Workflow*, can be used to automate some CI pipelines
 
-
+You can access all of thoses services.
 
 ## Conclusion
 

@@ -35,25 +35,27 @@
 #
 #############################################################################
 
-echo "Create Amazon Elastic Container Repository (Amazon ECR) for container images of the application:"
+# Source the colors script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/colors.sh"
 
-aws ecr create-repository --repository-name rollouts-demo --region $AWS_REGION
+print_header "Deploying Argo Rollouts Demo Application"
 
-echo "Clone the application sources repository and build an initial container image:"
+print_step "Creating Amazon Elastic Container Repository (Amazon ECR) for container images"
+aws ecr create-repository --repository-name rollouts-demo --region $AWS_REGION || true
 
+print_step "Cloning application source repository and building initial image"
 cd $WORKSPACE_PATH
 git clone https://github.com/argoproj/rollouts-demo.git
+cd rollouts-demo
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/build-rollouts-demo.sh
 
-echo "Check the EKS Pod Identity association for kargo addon"
-
+print_step "Checking the EKS Pod Identity association for kargo addon"
 aws eks list-pod-identity-associations --cluster-name hub-cluster | grep -A 3 "kargo-controller"
 
 sleep 5
 
-
-echo "Create Git repository for the application deployment configuration:"
-
+print_step "Creating Git repository for the application deployment configuration"
 curl -Ss -X 'POST' "$GITLAB_URL/api/v4/projects/" \
   -H "PRIVATE-TOKEN: $IDE_PASSWORD" \
   -H 'accept: application/json' \
@@ -62,13 +64,11 @@ curl -Ss -X 'POST' "$GITLAB_URL/api/v4/projects/" \
   \"name\": \"rollouts-demo-deploy\"
 }" && echo -e "\n"
 
-echo "Clone and populate the deployment Git repository:"
-
+print_step "Cloning and populating the deployment Git repository"
 git clone ssh://git@$NLB_DNS/$GIT_USERNAME/rollouts-demo-deploy.git $WORKSPACE_PATH/rollouts-demo-deploy
 cp -r $WORKSPACE_PATH/$WORKING_REPO/apps/rollouts-demo-deploy/* $WORKSPACE_PATH/rollouts-demo-deploy/
 
-echo "Update Account ID in ECR Urls and repoUrl in the application configuration for Kargo:"
-
+print_step "Updating Account ID in ECR URLs and repoUrl in the application configuration"
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GITLAB_URL|${GITLAB_URL}|g" {} +
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|GIT_USERNAME|${GIT_USERNAME}|g" {} +
 find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|MANAGEMENT_ACCOUNT_ID|${MGMT_ACCOUNT_ID}|g" {} +
@@ -77,8 +77,7 @@ find "$WORKSPACE_PATH/rollouts-demo-deploy" -type f -exec sed -i'' -e "s|AWS_REG
 find "$WORKSPACE_PATH/$WORKING_REPO/workloads" -type f -exec sed -i'' -e "s|GITLAB_URL|${GITLAB_URL}|g" {} +
 find "$WORKSPACE_PATH/$WORKING_REPO/workloads" -type f -exec sed -i'' -e "s|GIT_USERNAME|${GIT_USERNAME}|g" {} +
 
-echo "Enable workloads in Argo CD application:"
-
+print_step "Enabling workloads in Argo CD application"
 cat << EOF > $WORKSPACE_PATH/$WORKING_REPO/workloads/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -87,8 +86,7 @@ resources:
   - rollouts-demo-kargo.yaml
 EOF
 
-echo "Give access Argo CD to Git rollouts-demo-deploy repository"
-
+print_step "Giving ArgoCD access to Git rollouts-demo-deploy repository"
 envsubst << 'EOF' | kubectl apply -f -
 apiVersion: v1
 kind: Secret
@@ -104,8 +102,7 @@ stringData:
    password: $IDE_PASSWORD
 EOF
 
-echo "Add, Commit and Push:"
-
+print_step "Adding, committing and pushing changes"
 cd $WORKSPACE_PATH/rollouts-demo-deploy/
 git status
 git add .
@@ -118,28 +115,29 @@ git add .
 git commit -m "Enable rollouts-demo-deploy"
 git push
 
-echo "Refresh cluster-workloads application. Wait until rollouts-demo-kargo Argo CD application synced and ready."
+print_info "Refreshing cluster-workloads application and waiting for rollouts-demo-kargo to be ready"
 
-# Login to ArgoCD CLI (replace with your ArgoCD server URL)
+# Login to ArgoCD CLI
+print_step "Logging in to ArgoCD CLI"
 argocd login --username admin --password $IDE_PASSWORD --grpc-web-root-path /argocd $DOMAIN_NAME
 
-# Sync the cluster-workloads application (if needed)
+# Sync the cluster-workloads application
+print_step "Syncing the cluster-workloads application"
 argocd app sync cluster-workloads
 
 # Wait for the rollouts-demo-kargo application to be synced and healthy
+print_info "Waiting for the rollouts-demo-kargo application to be synced and healthy"
 argocd app wait rollouts-demo-kargo --health --sync
 
-
-echo "Access Kargo UI:"
+print_header "Setting up Kargo Access"
 
 export KARGO_URL=http://$(kubectl get svc kargo-api -n kargo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 curl --head -X GET --retry 20 --retry-all-errors --retry-delay 15 \
   --connect-timeout 5 --max-time 10 -k $KARGO_URL
-echo "Kargo url: $KARGO_URL"
-echo "Kargo password: $IDE_PASSWORD"
+print_info "Kargo URL: ${BOLD}$KARGO_URL${NC}"
+print_info "Kargo password: ${BOLD}$IDE_PASSWORD${NC}"
 
-echo "Give access Kargo to Git rollouts-demo-deploy repository"
-
+print_step "Giving Kargo access to Git rollouts-demo-deploy repository"
 envsubst << 'EOF' | kubectl apply -f -
 apiVersion: v1
 kind: Secret
@@ -154,9 +152,11 @@ stringData:
    password: $IDE_PASSWORD
 EOF
 
+print_step "Restarting Kargo controller"
 kubectl -n kargo rollout restart deploy kargo-controller
 
+print_info "Waiting for rollouts-demo-kargo application to be synced and healthy"
 argocd app wait rollouts-demo-kargo --health --sync
 
-echo "Argo Rollouts demo application deployment completed."
-echo "Next step: Run 5-cluster-access.sh to configure access to the EKS clusters."
+print_success "Argo Rollouts demo application deployment completed."
+print_info "Next step: Run 5-cluster-access.sh to configure access to the EKS clusters."

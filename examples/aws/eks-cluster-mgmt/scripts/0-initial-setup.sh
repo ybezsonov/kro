@@ -30,10 +30,16 @@
 #
 #############################################################################
 
+# Source the colors script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "$SCRIPT_DIR/colors.sh"
+
 set -e
 set -x
 
-echo "Create eks-cluster-mgmt Git repository"
+print_header "Initial Setup for EKS Cluster Management"
+
+print_step "Creating eks-cluster-mgmt Git repository"
 mkdir $WORKSPACE_PATH/$WORKING_REPO || true
 cd $WORKSPACE_PATH/$WORKING_REPO
 git config --global user.email "$GIT_USERNAME@example.com"
@@ -41,28 +47,32 @@ git config --global user.name "$GIT_USERNAME"
 
 git init -b main
 
+print_info "Copying example files from KRO repository"
 cp -r $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/* $WORKSPACE_PATH/$WORKING_REPO/
 
 git add .
 git commit -q -m "initial commit" || true
 
-echo "Creating the Management cluster"
+print_header "Creating the Management cluster"
 
 # Update the `terraform.tfvars` with your values
 # configure `accounts_ids` with the list of AWS accounts you want to use for spoke clusters. 
 # If you want to create spoke clusters in the same management account, it just needs the management account id. 
 # This parameter is used for IAM roles configuration.
 
+print_step "Updating Terraform configuration with management account ID"
 sed -i "s|account_ids = \".*\"|account_ids = \"$MGMT_ACCOUNT_ID\"|" "$WORKSPACE_PATH/$WORKING_REPO/terraform/hub/terraform.tfvars"
 /usr/lib/code-server/bin/code-server $WORKSPACE_PATH/$WORKING_REPO/terraform/hub/terraform.tfvars
 
+print_info "Committing changes to Git repository"
 cd $WORKSPACE_PATH/$WORKING_REPO/
 git status
 git add .
 git commit -m "Terraform values"
 
+print_step "Running Terraform to create management cluster"
 cd $WORKSPACE_PATH/$WORKING_REPO/terraform/hub
 ./install.sh
 
-echo "Initial setup completed successfully."
-echo "Next step: Run 1-argocd-gitlab-setup.sh to configure ArgoCD and GitLab."
+print_success "Initial setup completed successfully."
+print_info "Next step: Run 1-argocd-gitlab-setup.sh to configure ArgoCD and GitLab."
