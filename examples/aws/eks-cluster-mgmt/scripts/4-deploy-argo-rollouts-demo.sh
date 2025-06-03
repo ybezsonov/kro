@@ -111,6 +111,7 @@ git push
 
 cd $WORKSPACE_PATH/$WORKING_REPO/
 git status
+git pull
 git add .
 git commit -m "Enable rollouts-demo-deploy"
 git push
