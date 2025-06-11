@@ -159,7 +159,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: gitlab-init
-        image: bitnami/kubectl:latest
+        image: alpine/k8s:1.32.5
         command:
         - /bin/bash
         - -c
