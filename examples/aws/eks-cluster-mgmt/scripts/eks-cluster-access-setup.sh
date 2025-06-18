@@ -237,4 +237,7 @@ print_warning "It is idempotent and can be run multiple times without errors"
 # Parse values.yaml and connect to clusters
 parse_values_yaml
 
+print_header "Default to hub cluster"
+kubectx hub-cluster
+
 print_success "EKS cluster access setup completed."

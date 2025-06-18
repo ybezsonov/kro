@@ -97,11 +97,17 @@ git add .
 git commit -m "add clusters definitions"
 git push
 
+sleep 10
+
 print_step "Syncing clusters application in ArgoCD"
 argocd app sync clusters
+argocd app wait clusters
 
 print_info "Checking EKS cluster creation status"
 kubectl get EksClusterwithvpcs -A
 
 print_success "Spoke EKS clusters creation initiated."
+
+print_info "Wait for all clusters to be created, monitor kro and ACK logs"
+
 print_info "Next step: Run 4-deploy-argo-rollouts-demo.sh to deploy the Argo Rollouts demo application."

@@ -168,7 +168,7 @@ This script creates the spoke EKS clusters in different regions. It:
 4. Syncs the clusters application in ArgoCD
 5. Creates the EKS clusters using KRO
 
-You can check the files : `$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml` and `$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml` if you want to make some changes to the created spoke workloads.
+> You can check the files : `$WORKSPACE_PATH/$WORKING_REPO/addons/tenants/tenant1/default/addons/multi-acct/values.yaml` and `$WORKSPACE_PATH/$WORKING_REPO/fleet/kro-values/tenants/tenant1/kro-clusters/values.yaml` if you want to make some changes to the created spoke workloads.
 
 > After some times (15-20mn), the clusters should have been created in the spoke/management account(s):
 
@@ -267,7 +267,7 @@ After that, you can use kubectl to connect to any of the EKS clusters.
 This script also create an html file that will be use as a dashboard for our demo application progressive rollout, the dashboard is available at: `/home/ec2-user/environment/kro/examples/aws/eks-cluster-mgmt/scripts/dashboard.html`
 
 ```bash
-code /home/ec2-user/environment/kro/examples/aws/eks-cluster-mgmt/scripts/dashboard.html
+code /home/ec2-user/environment/eks-cluster-mgmt/scripts/dashboard.html
 ```
 
 > Download the dashboard, and open it in your browser
@@ -311,6 +311,17 @@ When you play with creating other color builds and promoting them to different e
 ```bash
 $WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/multi-cluster-dashboard-generator.sh
 ```
+
+> Note: If you use more than one accounts for spoke, the script won't work as is as it don't know the aws account mapping for clusters. You'll need to manually connect to each accounts and update the kube config file like
+> aws eks update-kubeconfig --name "cluster-test" --region "eu-central-1" --alias "cluster-test" --profile <YOUR APPROPRIATE PROFILE>
+> aws eks update-kubeconfig --name "cluster-pre-prod" --region "us-west-2" --alias "cluster-pre-prod" --profile <YOUR APPROPRIATE PROFILE>
+> aws eks update-kubeconfig --name "cluster-prod-us" --region "us-west-2" --alias "cluster-prod-us" --profile <YOUR APPROPRIATE PROFILE>
+> aws eks update-kubeconfig --name "cluster-prod-eu" --region "eu-west-1" --alias "cluster-prod-eu" --profile <YOUR APPROPRIATE PROFILE>
+>
+> In this case you can use the script with manual flag meaning you have manually configure kubectl to work with all 4 clusters
+> ```bash
+>$WORKSPACE_PATH/kro/examples/aws/eks-cluster-mgmt/scripts/multi-cluster-dashboard-generator.sh --manual
+>```
 
 then download the generated Dashboard html, and open it in your browser
 

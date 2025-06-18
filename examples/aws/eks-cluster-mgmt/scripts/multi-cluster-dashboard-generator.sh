@@ -16,7 +16,11 @@
 #   4. Saves the dashboard to an HTML file for viewing in a browser
 #
 # USAGE:
-#   ./multi-cluster-dashboard-generator.sh
+#   ./multi-cluster-dashboard-generator.sh [--manual]
+#
+#   Options:
+#     --manual    Skip EKS cluster existence check and assume kubectl is already
+#                 configured to connect to the clusters
 #
 # PREREQUISITES:
 #   - AWS CLI configured with appropriate credentials
@@ -36,6 +40,19 @@ source "$SCRIPT_DIR/colors.sh"
 # Set AWS_PAGER to empty to disable paging
 export AWS_PAGER=""
 
+# Parse command line arguments
+MANUAL_MODE=false
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --manual) MANUAL_MODE=true; shift ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+done
+
+if [ "$MANUAL_MODE" = true ]; then
+    print_info "Running in manual mode. Skipping EKS cluster existence checks."
+fi
+
 # Path to output HTML file
 OUTPUT_HTML="/home/ec2-user/environment/eks-cluster-mgmt/scripts/dashboard.html"
 
@@ -52,6 +69,12 @@ mkdir -p "$(dirname "$OUTPUT_HTML")"
 check_cluster_exists() {
     local cluster_name="$1"
     local region="$2"
+    
+    # Skip check if in manual mode
+    if [ "$MANUAL_MODE" = true ]; then
+        print_info "Manual mode: Assuming cluster $cluster_name exists."
+        return 0
+    fi
     
     print_info "Checking if cluster $cluster_name exists in region $region..."
     if aws eks describe-cluster --name "$cluster_name" --region "$region" &> /dev/null; then
@@ -71,8 +94,14 @@ get_argo_demo_url() {
     
     print_info "Getting Argo demo app URL for $cluster_name in $region..."
     
-    # Update kubeconfig for this cluster
-    aws eks update-kubeconfig --name "$cluster_name" --region "$region" --alias "$cluster_name" > /dev/null
+    # Check if kubectl is already working for this cluster
+    if ! kubectl --context="$cluster_name" get nodes &> /dev/null; then
+        print_info "kubectl not working for $cluster_name, updating kubeconfig..."
+        # Update kubeconfig for this cluster
+        aws eks update-kubeconfig --name "$cluster_name" --region "$region" --alias "$cluster_name" > /dev/null
+    else
+        print_info "kubectl already working for $cluster_name, skipping kubeconfig update"
+    fi
     
     # Check if we can connect to the cluster
     if ! kubectl --context="$cluster_name" get nodes &> /dev/null; then
@@ -265,6 +294,10 @@ add_known_clusters
 # Generate the HTML dashboard
 generate_dashboard
 
+print_header "Default to hub cluster"
+kubectx hub-cluster
+
 print_success "Dashboard generation completed."
 print_info "Dashboard available at: ${BOLD}$OUTPUT_HTML${NC}"
 print_info "Open this file in a web browser to view all environments side by side."
+

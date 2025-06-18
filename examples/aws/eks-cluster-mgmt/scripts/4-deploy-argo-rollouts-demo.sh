@@ -35,6 +35,7 @@
 #
 #############################################################################
 
+
 # Source the colors script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "$SCRIPT_DIR/colors.sh"
@@ -43,6 +44,63 @@ print_header "Deploying Argo Rollouts Demo Application"
 
 print_step "Creating Amazon Elastic Container Repository (Amazon ECR) for container images"
 aws ecr create-repository --repository-name rollouts-demo --region $AWS_REGION || true
+
+print_step "Setting up cross-account permissions for ECR repository"
+# Define spoke account IDs - if not already defined, use the provided accounts
+if [ -z "$SPOKE_ACCOUNT_IDS" ]; then
+  export SPOKE_ACCOUNT_IDS="515966522948 586794472760 825765380480"
+  print_info "Using default SPOKE_ACCOUNT_IDS: $SPOKE_ACCOUNT_IDS"
+fi
+
+# Create policy statements for each spoke account
+POLICY_STATEMENTS=""
+for ACCOUNT_ID in $SPOKE_ACCOUNT_IDS; do
+  if [ -n "$POLICY_STATEMENTS" ]; then
+    POLICY_STATEMENTS="$POLICY_STATEMENTS,"
+  fi
+  POLICY_STATEMENTS="$POLICY_STATEMENTS
+    {
+      \"Sid\": \"AllowPullFrom${ACCOUNT_ID}\",
+      \"Effect\": \"Allow\",
+      \"Principal\": {
+        \"AWS\": \"arn:aws:iam::${ACCOUNT_ID}:root\"
+      },
+      \"Action\": [
+        \"ecr:BatchGetImage\",
+        \"ecr:GetDownloadUrlForLayer\",
+        \"ecr:BatchCheckLayerAvailability\"
+      ]
+    }"
+done
+
+# Create the repository policy using a heredoc to ensure proper JSON formatting
+POLICY=$(cat <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowPullFromSameAccount",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::${MGMT_ACCOUNT_ID}:root"
+      },
+      "Action": [
+        "ecr:*"
+      ]
+    },${POLICY_STATEMENTS}
+  ]
+}
+EOF
+)
+
+# Apply the policy to the repository
+print_info "Applying cross-account ECR repository policy"
+aws ecr set-repository-policy \
+  --repository-name rollouts-demo \
+  --policy-text "$POLICY" \
+  --region $AWS_REGION
+
+print_success "ECR repository policy updated to allow access from spoke accounts"
 
 print_step "Cloning application source repository and building initial image"
 cd $WORKSPACE_PATH
